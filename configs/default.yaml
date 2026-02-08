@@ -1,0 +1,92 @@
+system:
+  execution_mode: paper        # backtest | paper | live
+  log_level: INFO
+  timezone: UTC
+
+exchanges:
+  enabled:
+    - binance
+    - okx
+    - bybit
+    - upbit
+    - kucoin
+
+symbols:
+  - BTC/USDT
+  - ETH/USDT
+  - SOL/USDT
+  - XRP/USDT
+  - DOGE/USDT
+
+detector:
+  spatial:
+    enabled: true
+    min_spread_pct: 0.25
+    min_depth_usd: 1000
+    max_latency_ms: 500
+
+  triangular:
+    enabled: true
+    min_profit_pct: 0.15
+    paths:
+      - [BTC/USDT, ETH/BTC, ETH/USDT]
+      - [BTC/USDT, SOL/BTC, SOL/USDT]
+
+  statistical:
+    enabled: false
+    lookback_periods: 60
+    entry_zscore: 2.0
+    exit_zscore: 0.5
+    p_value_threshold: 0.05
+
+risk:
+  max_position_per_coin_usd: 10000
+  max_position_per_exchange_usd: 50000
+  max_total_exposure_usd: 100000
+  max_daily_loss_usd: 500
+  max_daily_loss_pct: 1.0
+  max_drawdown_pct: 5.0
+  price_deviation_threshold_pct: 10.0
+  max_spread_pct: 5.0
+  consecutive_loss_limit: 10
+  cooldown_minutes: 30
+
+rebalancer:
+  check_interval_minutes: 60
+  imbalance_threshold_pct: 30
+  preferred_networks:
+    USDT: [TRC20, SOL, Arbitrum]
+    BTC: [Lightning, Bitcoin]
+
+alerts:
+  telegram:
+    enabled: true
+    chat_id: ""
+    bot_token: ""
+  discord:
+    enabled: false
+    bot_token: ""
+    guild_id: 0
+    channel_id: 0
+  thresholds:
+    opportunity_min_pct: 0.5
+    daily_pnl_alert: true
+    error_alert: true
+
+database:
+  postgres:
+    host: localhost
+    port: 5432
+    database: arbot
+    user: arbot
+    password: ""
+
+  clickhouse:
+    host: localhost
+    port: 9000
+    database: arbot
+
+  redis:
+    host: localhost
+    port: 6379
+    db: 0

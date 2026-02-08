@@ -1,0 +1,104 @@
+exchanges:
+  binance:
+    tier: 1
+    maker_fee_pct: 0.10
+    taker_fee_pct: 0.10
+    rate_limit:
+      type: weight
+      limit: 1200
+      window: 60
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  okx:
+    tier: 1
+    maker_fee_pct: 0.08
+    taker_fee_pct: 0.10
+    rate_limit:
+      type: per_endpoint
+      default_limit: 20
+      window: 2
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  bybit:
+    tier: 1
+    maker_fee_pct: 0.10
+    taker_fee_pct: 0.10
+    rate_limit:
+      type: count
+      limit: 600
+      window: 5
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  upbit:
+    tier: 2
+    maker_fee_pct: 0.25
+    taker_fee_pct: 0.25
+    rate_limit:
+      type: count
+      limit: 10
+      window: 1
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  kucoin:
+    tier: 2
+    maker_fee_pct: 0.10
+    taker_fee_pct: 0.10
+    rate_limit:
+      type: count
+      limit: 30
+      window: 3
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  bithumb:
+    tier: 2
+    maker_fee_pct: 0.25
+    taker_fee_pct: 0.25
+    rate_limit:
+      type: count
+      limit: 20
+      window: 1
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  gate:
+    tier: 2
+    maker_fee_pct: 0.20
+    taker_fee_pct: 0.20
+    rate_limit:
+      type: count
+      limit: 300
+      window: 10
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
+
+  bitget:
+    tier: 2
+    maker_fee_pct: 0.10
+    taker_fee_pct: 0.10
+    rate_limit:
+      type: count
+      limit: 20
+      window: 1
+    websocket:
+      orderbook_depth: 10
+      reconnect_delay_s: 5
+      max_reconnect_attempts: 10
