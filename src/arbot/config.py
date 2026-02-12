@@ -85,6 +85,8 @@ class RebalancerConfig(BaseModel):
 
     check_interval_minutes: int = 60
     imbalance_threshold_pct: float = 30.0
+    min_transfer_usd: float = 100.0
+    target_allocation: dict[str, float] = Field(default_factory=dict)
     preferred_networks: dict[str, list[str]] = Field(default_factory=dict)
 
 

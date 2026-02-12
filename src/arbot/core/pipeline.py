@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from arbot.detector.spatial import SpatialDetector
+from arbot.detector.statistical import StatisticalDetector
 from arbot.detector.triangular import TriangularDetector
 from arbot.execution.base import BaseExecutor, InsufficientBalanceError
 from arbot.models.orderbook import OrderBook
@@ -48,7 +49,7 @@ class PipelineStats:
 class ArbitragePipeline:
     """Orchestrates detection -> risk check -> execution flow.
 
-    Supports both spatial and triangular detectors. In each cycle:
+    Supports spatial, triangular, and statistical detectors. In each cycle:
     1. Detectors scan order books for arbitrage signals.
     2. Risk manager validates each signal against risk parameters.
     3. Executor places (simulated or real) trades for approved signals.
@@ -56,6 +57,7 @@ class ArbitragePipeline:
     Attributes:
         spatial_detector: Spatial arbitrage detector (optional).
         triangular_detector: Triangular arbitrage detector (optional).
+        statistical_detector: Statistical arbitrage detector (optional).
         executor: Trade executor (paper or live).
         risk_manager: Risk manager for signal validation.
     """
@@ -66,6 +68,7 @@ class ArbitragePipeline:
         risk_manager: RiskManager,
         spatial_detector: SpatialDetector | None = None,
         triangular_detector: TriangularDetector | None = None,
+        statistical_detector: StatisticalDetector | None = None,
     ) -> None:
         """Initialize the pipeline.
 
@@ -74,9 +77,11 @@ class ArbitragePipeline:
             risk_manager: Risk manager instance.
             spatial_detector: Spatial detector (cross-exchange).
             triangular_detector: Triangular detector (single-exchange).
+            statistical_detector: Statistical detector (cointegration-based).
         """
         self.spatial_detector = spatial_detector
         self.triangular_detector = triangular_detector
+        self.statistical_detector = statistical_detector
         self.executor = executor
         self.risk_manager = risk_manager
         self._stats = PipelineStats()
@@ -120,6 +125,10 @@ class ArbitragePipeline:
                 triangular_orderbooks, triangular_exchange
             )
             signals.extend(tri_signals)
+
+        if self.statistical_detector is not None and orderbooks:
+            stat_signals = self.statistical_detector.detect(orderbooks)
+            signals.extend(stat_signals)
 
         self._stats.total_signals_detected += len(signals)
 

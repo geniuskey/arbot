@@ -53,6 +53,10 @@ class RiskConfig(BaseModel):
         max_spread_pct: Maximum allowed spread percentage.
         consecutive_loss_limit: Number of consecutive losses before circuit breaker.
         cooldown_minutes: Cooldown period after circuit breaker activation.
+        flash_crash_pct: Percentage drop threshold for flash crash detection.
+        spread_std_threshold: Standard deviations from mean spread for anomaly.
+        stale_threshold_seconds: Maximum age of order book data in seconds.
+        warning_threshold_pct: Percentage of limits before WARNING state.
     """
 
     max_position_per_coin_usd: float = 10_000
@@ -65,3 +69,7 @@ class RiskConfig(BaseModel):
     max_spread_pct: float = 5.0
     consecutive_loss_limit: int = 10
     cooldown_minutes: int = 30
+    flash_crash_pct: float = 10.0
+    spread_std_threshold: float = 3.0
+    stale_threshold_seconds: float = 30.0
+    warning_threshold_pct: float = 70.0

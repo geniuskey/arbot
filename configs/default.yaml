@@ -50,10 +50,16 @@ risk:
   max_spread_pct: 5.0
   consecutive_loss_limit: 10
   cooldown_minutes: 30
+  flash_crash_pct: 10.0
+  spread_std_threshold: 3.0
+  stale_threshold_seconds: 30.0
+  warning_threshold_pct: 70.0
 
 rebalancer:
   check_interval_minutes: 60
   imbalance_threshold_pct: 30
+  min_transfer_usd: 100
+  target_allocation: {}          # empty = equal split across enabled exchanges
   preferred_networks:
     USDT: [TRC20, SOL, Arbitrum]
     BTC: [Lightning, Bitcoin]
