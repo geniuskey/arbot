@@ -8,7 +8,10 @@ export default defineConfig({
   cleanUrls: true,
 
   head: [
-    ['link', { rel: 'icon', href: '/arbot/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/arbot/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/arbot/favicon-32x32.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/arbot/favicon-16x16.png' }],
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/arbot/apple-touch-icon.png' }],
   ],
 
   themeConfig: {
