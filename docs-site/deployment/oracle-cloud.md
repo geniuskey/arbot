@@ -14,7 +14,60 @@ Oracle Cloud Always Free 티어를 활용하여 ArBot을 무료로 운영하는 
 ## 사전 준비
 
 1. [Oracle Cloud 계정 생성](https://cloud.oracle.com/free) (신용카드 필요, 과금 없음)
-2. SSH 키 쌍 준비
+2. SSH 키 쌍 준비 (아래 참고)
+
+## SSH 키 생성
+
+VM에 접속하려면 SSH 키 쌍(공개키 + 개인키)이 필요합니다.
+
+### Windows (PowerShell)
+
+```powershell
+ssh-keygen -t ed25519 -C "arbot"
+```
+
+- 저장 경로: 기본값 `C:\Users\<사용자>\.ssh\id_ed25519` (Enter)
+- 비밀번호: 설정 또는 빈칸 (Enter)
+
+생성된 파일:
+
+| 파일 | 용도 |
+|------|------|
+| `~/.ssh/id_ed25519` | 개인키 (절대 공유 금지) |
+| `~/.ssh/id_ed25519.pub` | 공개키 (OCI에 등록) |
+
+공개키 내용 복사:
+
+```powershell
+cat ~/.ssh/id_ed25519.pub
+```
+
+### macOS / Linux
+
+```bash
+ssh-keygen -t ed25519 -C "arbot"
+cat ~/.ssh/id_ed25519.pub
+```
+
+### 기존 키가 있는 경우
+
+```bash
+# 이미 키가 있는지 확인
+ls ~/.ssh/id_ed25519.pub 2>/dev/null || ls ~/.ssh/id_rsa.pub 2>/dev/null
+```
+
+파일이 있으면 새로 만들 필요 없이 기존 공개키를 사용하면 됩니다.
+
+### OCI에 등록
+
+VM 인스턴스 생성 시 **"Add SSH keys"** 단계에서:
+
+1. **Paste public keys** 선택
+2. `~/.ssh/id_ed25519.pub` 내용 붙여넣기
+
+::: warning
+개인키(`id_ed25519`)는 절대 공유하지 마세요. 공개키(`.pub`)만 등록합니다.
+:::
 
 ## Step 1: VM 인스턴스 생성
 
@@ -57,7 +110,7 @@ VCN > Subnet > Security List에서 Ingress Rule 추가:
 SSH 접속 후 setup 스크립트를 실행합니다.
 
 ```bash
-ssh -i ~/.ssh/id_rsa ubuntu@<VM_PUBLIC_IP>
+ssh ubuntu@<VM_PUBLIC_IP>
 
 # 소스 클론
 git clone https://github.com/geniuskey/arbot.git ~/arbot
@@ -69,7 +122,7 @@ chmod +x deploy/oracle-cloud/setup.sh
 
 # Docker 그룹 적용을 위해 재접속
 exit
-ssh -i ~/.ssh/id_rsa ubuntu@<VM_PUBLIC_IP>
+ssh ubuntu@<VM_PUBLIC_IP>
 ```
 
 ## Step 3: 환경 변수 설정
