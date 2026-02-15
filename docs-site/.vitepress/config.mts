@@ -70,6 +70,7 @@ export default withMermaid(
               { text: 'Docker 배포', link: '/deployment/docker' },
               { text: '환경 변수', link: '/deployment/environment' },
               { text: '프로덕션 배포', link: '/deployment/production' },
+              { text: 'Oracle Cloud 무료 배포', link: '/deployment/oracle-cloud' },
             ],
           },
         ],
