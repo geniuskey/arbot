@@ -7,13 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
+# Copy source and install
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-
-# Copy source code
 COPY src/ src/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 # Copy configs
 COPY configs/ configs/
