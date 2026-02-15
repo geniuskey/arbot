@@ -128,6 +128,22 @@ export default withMermaid(
       darkModeSwitchLabel: '다크 모드',
     },
 
+    vite: {
+      optimizeDeps: {
+        include: [
+          'mermaid',
+          'dayjs',
+          'dayjs/plugin/customParseFormat.js',
+          'dayjs/plugin/advancedFormat.js',
+          'dayjs/plugin/isoWeek.js',
+          'dayjs/plugin/duration.js',
+          '@braintree/sanitize-url',
+          'cytoscape',
+          'cytoscape-cose-bilkent',
+        ],
+      },
+    },
+
     mermaid: {},
   })
 )
