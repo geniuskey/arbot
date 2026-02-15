@@ -7,7 +7,7 @@ collecting statistics on detection, execution, and rejection.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from arbot.detector.spatial import SpatialDetector
 from arbot.detector.statistical import StatisticalDetector
@@ -43,7 +43,7 @@ class PipelineStats:
     total_pnl_usd: float = 0.0
     total_fees_usd: float = 0.0
     cycles_run: int = 0
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class ArbitragePipeline:

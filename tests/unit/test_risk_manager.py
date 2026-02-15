@@ -1,6 +1,6 @@
 """Tests for arbot.risk.manager.RiskManager."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from arbot.models.balance import AssetBalance, ExchangeBalance, PortfolioSnapshot
 from arbot.models.config import RiskConfig
@@ -220,7 +220,7 @@ class TestRiskManagerCircuitBreaker:
         assert rm.is_in_cooldown is True
 
         # Manually set cooldown to the past
-        rm._cooldown_until = datetime.utcnow() - timedelta(minutes=1)
+        rm._cooldown_until = datetime.now(UTC) - timedelta(minutes=1)
         assert rm.is_in_cooldown is False
 
         signal = _make_signal()

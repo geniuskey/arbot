@@ -260,17 +260,16 @@ class TestRun:
             )
             mock_sim_cls.return_value = mock_sim
 
-            # Schedule shutdown after a brief delay
+            # Use an explicit shutdown event instead of os.kill(SIGINT)
+            # which is unreliable on Windows asyncio event loops.
+            shutdown_event = asyncio.Event()
+
             async def trigger_shutdown() -> None:
                 await asyncio.sleep(0.1)
-                # Send SIGINT to stop the run function
-                import os
-                import signal
-
-                os.kill(os.getpid(), signal.SIGINT)
+                shutdown_event.set()
 
             task = asyncio.create_task(trigger_shutdown())
-            await run(config)
+            await run(config, shutdown_event=shutdown_event)
             await task
 
             # Verify cleanup was called

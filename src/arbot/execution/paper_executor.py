@@ -5,7 +5,7 @@ placing actual orders. Maintains virtual balances and tracks
 all trades for PnL calculation.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from arbot.execution.base import BaseExecutor, InsufficientBalanceError
 from arbot.execution.fill_simulator import FillSimulator
@@ -160,7 +160,7 @@ class PaperExecutor(BaseExecutor):
             )
 
         return PortfolioSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             exchange_balances=exchange_balances,
         )
 

@@ -153,7 +153,10 @@ def _build_initial_balances(config: AppConfig) -> dict[str, dict[str, float]]:
     return balances
 
 
-async def run(config: AppConfig) -> None:
+async def run(
+    config: AppConfig,
+    shutdown_event: asyncio.Event | None = None,
+) -> None:
     """Run the ArBot system.
 
     Assembles all components, starts price collection, and runs the
@@ -161,6 +164,8 @@ async def run(config: AppConfig) -> None:
 
     Args:
         config: Validated application configuration.
+        shutdown_event: Optional external event to trigger shutdown.
+            If not provided, one is created internally with signal handlers.
     """
     logger = get_logger("main")
     logger.info("arbot_starting", mode=config.system.execution_mode.value)
@@ -270,15 +275,25 @@ async def run(config: AppConfig) -> None:
         logger.info("discord_bot_enabled")
 
     # Setup shutdown event
-    shutdown_event = asyncio.Event()
+    if shutdown_event is None:
+        shutdown_event = asyncio.Event()
 
     def _signal_handler() -> None:
         logger.info("shutdown_signal_received")
         shutdown_event.set()
 
     loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, _signal_handler)
+    try:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, _signal_handler)
+    except NotImplementedError:
+        # Windows does not support loop.add_signal_handler;
+        # fall back to signal.signal() which works cross-platform.
+        def _sync_signal_handler(signum: int, frame: object) -> None:
+            loop.call_soon_threadsafe(_signal_handler)
+
+        signal.signal(signal.SIGINT, _sync_signal_handler)
+        signal.signal(signal.SIGTERM, _sync_signal_handler)
 
     try:
         # Connect Redis
@@ -306,6 +321,8 @@ async def run(config: AppConfig) -> None:
         # Wait for shutdown signal
         await shutdown_event.wait()
 
+    except KeyboardInterrupt:
+        _signal_handler()
     finally:
         logger.info("arbot_shutting_down")
 

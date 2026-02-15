@@ -1,6 +1,6 @@
 """Balance and portfolio data models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +37,7 @@ class ExchangeBalance(BaseModel):
 
     exchange: str
     balances: dict[str, AssetBalance] = Field(default_factory=dict)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def total_usd_value(self) -> float:
@@ -57,7 +57,7 @@ class PortfolioSnapshot(BaseModel):
         exchange_balances: Mapping of exchange name to balance.
     """
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     exchange_balances: dict[str, ExchangeBalance] = Field(default_factory=dict)
 
     @property

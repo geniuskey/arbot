@@ -7,7 +7,7 @@ applying trading fees.
 
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from arbot.models.config import TradingFee
 from arbot.models.orderbook import OrderBook
@@ -104,5 +104,5 @@ class FillSimulator:
             fee=fee_amount,
             fee_asset=fee_asset,
             latency_ms=elapsed_ms,
-            filled_at=datetime.utcnow(),
+            filled_at=datetime.now(UTC),
         )

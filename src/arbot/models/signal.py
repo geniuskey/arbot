@@ -1,7 +1,7 @@
 """Arbitrage signal data models."""
 
 import enum
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -63,6 +63,6 @@ class ArbitrageSignal(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     orderbook_depth_usd: float
     status: SignalStatus = SignalStatus.DETECTED
-    detected_at: datetime = Field(default_factory=datetime.utcnow)
+    detected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     executed_at: datetime | None = None
     metadata: dict[str, Any] | None = None

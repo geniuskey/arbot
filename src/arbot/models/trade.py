@@ -2,7 +2,7 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -64,7 +64,7 @@ class Order(BaseModel):
     quantity: float
     price: float | None = None
     status: OrderStatus = OrderStatus.PENDING
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TradeResult(BaseModel):
@@ -88,4 +88,4 @@ class TradeResult(BaseModel):
     fee: float
     fee_asset: str
     latency_ms: float
-    filled_at: datetime = Field(default_factory=datetime.utcnow)
+    filled_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

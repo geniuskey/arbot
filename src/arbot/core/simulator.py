@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from arbot.core.pipeline import ArbitragePipeline, PipelineStats
 
@@ -28,7 +28,7 @@ class SimulationReport:
         trade_count: Total number of executed trade pairs.
     """
 
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
     duration_seconds: float = 0.0
     pipeline_stats: PipelineStats = field(default_factory=PipelineStats)
@@ -86,7 +86,7 @@ class PaperTradingSimulator:
             return
 
         self._running = True
-        self._started_at = datetime.utcnow()
+        self._started_at = datetime.now(UTC)
         self._orderbook_provider = orderbook_provider
         self._task = asyncio.create_task(self._run_loop())
 
@@ -100,7 +100,7 @@ class PaperTradingSimulator:
             except asyncio.CancelledError:
                 pass
             self._task = None
-        self._stopped_at = datetime.utcnow()
+        self._stopped_at = datetime.now(UTC)
 
     async def _run_loop(self) -> None:
         """Internal simulation loop."""
@@ -132,7 +132,7 @@ class PaperTradingSimulator:
             SimulationReport with all performance metrics.
         """
         stats = self.pipeline.get_stats()
-        now = self._stopped_at or datetime.utcnow()
+        now = self._stopped_at or datetime.now(UTC)
         started = self._started_at or now
 
         duration = (now - started).total_seconds()

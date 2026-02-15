@@ -6,7 +6,7 @@ and circuit breaker conditions based on RiskConfig parameters.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from arbot.models.balance import PortfolioSnapshot
 from arbot.models.config import RiskConfig
@@ -86,7 +86,7 @@ class RiskManager:
             passes all risk checks. reason describes why it was rejected
             or "approved" if it passed.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Reset daily PnL at the start of a new day
         if self._daily_pnl_date is None or self._daily_pnl_date.date() != now.date():
@@ -151,7 +151,7 @@ class RiskManager:
             pnl: Profit or loss in USD from the trade.
             equity: Optional current total equity for drawdown tracking.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Reset daily PnL at the start of a new day
         if self._daily_pnl_date is None or self._daily_pnl_date.date() != now.date():
@@ -190,7 +190,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Reset daily counters (PnL and date)."""
         self._daily_pnl = 0.0
-        self._daily_pnl_date = datetime.utcnow()
+        self._daily_pnl_date = datetime.now(UTC)
 
     @property
     def daily_pnl(self) -> float:
@@ -207,7 +207,7 @@ class RiskManager:
         """Whether the circuit breaker cooldown is active."""
         if self._cooldown_until is None:
             return False
-        return datetime.utcnow() < self._cooldown_until
+        return datetime.now(UTC) < self._cooldown_until
 
     @property
     def trade_count(self) -> int:
