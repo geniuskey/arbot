@@ -47,7 +47,7 @@ services:
           memory: 1G
 
   prometheus:
-    image: prom/prometheus:v2
+    image: prom/prometheus:v2.54.1
     restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"
@@ -63,7 +63,7 @@ services:
           memory: 512M
 
   grafana:
-    image: grafana/grafana:11
+    image: grafana/grafana-oss:11.5.2
     restart: unless-stopped
     ports:
       - "3000:3000"
