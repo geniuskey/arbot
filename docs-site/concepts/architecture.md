@@ -5,18 +5,18 @@ ArBot의 전체 시스템 구조와 핵심 모듈, 데이터 흐름을 설명합
 ## 전체 시스템 구성도
 
 ```mermaid
-graph LR
+graph TD
     WS[거래소 WebSocket] --> CONN[Exchange Connector]
     CONN --> NORM[Normalizer]
     NORM --> REDIS[(Redis Cache / Pub/Sub)]
     REDIS --> DET[Opportunity Detector]
     REDIS --> CH[(ClickHouse)]
+    REDIS --> REBAL[Rebalancer]
     DET --> RISK[Risk Manager]
     RISK --> EXEC[Execution Engine]
     EXEC --> PG[(PostgreSQL)]
-    PG --> DASH[Dashboard]
     EXEC --> ALERT[Alerting]
-    REDIS --> REBAL[Rebalancer]
+    PG --> DASH[Dashboard]
 ```
 
 ## 핵심 모듈
