@@ -13,6 +13,7 @@ import os
 import signal
 import sys
 
+from arbot.alerts.manager import AlertManager
 from arbot.alerts.notifier_protocol import Notifier
 from arbot.config import AppConfig, ExecutionMode, ExchangeConfig, load_config
 from arbot.connectors.base import BaseConnector
@@ -26,6 +27,7 @@ from arbot.detector.spatial import SpatialDetector
 from arbot.execution.paper_executor import PaperExecutor
 from arbot.logging import get_logger, setup_logging
 from arbot.models.config import ExchangeInfo, RiskConfig, TradingFee
+from arbot.models.trade import TradeResult
 from arbot.risk.manager import RiskManager
 from arbot.storage.redis_cache import RedisCache
 
@@ -243,14 +245,13 @@ async def run(
             all_obs.update(obs)
         return all_obs
 
-    simulator = PaperTradingSimulator(pipeline=pipeline, interval_seconds=1.0)
-
     # Setup notification channels
     notifiers: list[Notifier] = []
     discord_bot: ArBotDiscord | None = None
     discord_task: asyncio.Task[None] | None = None
 
     # Telegram notifier (if configured)
+    telegram_notifier: TelegramNotifier | None = None
     if config.alerts.telegram.enabled and config.alerts.telegram.bot_token:
         from arbot.alerts.telegram import TelegramNotifier
 
@@ -260,6 +261,31 @@ async def run(
         )
         notifiers.append(telegram_notifier)
         logger.info("telegram_notifier_enabled")
+
+    # Alert manager
+    alert_manager: AlertManager | None = None
+    if notifiers:
+        alert_manager = AlertManager(notifier=notifiers)
+
+    # Trade callback for notifications
+    async def _on_trade(
+        buy: TradeResult, sell: TradeResult, pnl: float
+    ) -> None:
+        if alert_manager is None or telegram_notifier is None:
+            return
+        msg = (
+            f"*Trade Executed*\n\n"
+            f"Buy: {buy.exchange} @ ${buy.filled_price:,.2f}\n"
+            f"Sell: {sell.exchange} @ ${sell.filled_price:,.2f}\n"
+            f"Qty: {buy.filled_quantity:.6f}\n"
+            f"PnL: ${pnl:,.4f}\n"
+            f"Fees: ${buy.fee + sell.fee:,.4f}"
+        )
+        await alert_manager.send_alert("trade_result", msg)
+
+    simulator = PaperTradingSimulator(
+        pipeline=pipeline, interval_seconds=1.0, on_trade=_on_trade,
+    )
 
     # Discord bot (if configured)
     discord_notifier: DiscordNotifier | None = None
@@ -320,6 +346,17 @@ async def run(
             symbols=config.symbols,
             exchanges=[c.exchange_name for c in connectors],
         )
+
+        # Send startup notification
+        if alert_manager is not None:
+            exchanges_str = ", ".join(c.exchange_name for c in connectors)
+            await alert_manager.send_alert(
+                "system_status",
+                f"ArBot started\n"
+                f"Mode: {config.system.execution_mode.value}\n"
+                f"Exchanges: {exchanges_str}\n"
+                f"Symbols: {len(config.symbols)}",
+            )
 
         # Start Discord bot
         if discord_bot is not None:

@@ -54,12 +54,14 @@ class PaperTradingSimulator:
         self,
         pipeline: ArbitragePipeline,
         interval_seconds: float = 1.0,
+        on_trade: OnTradeCallback | None = None,
     ) -> None:
         """Initialize the simulator.
 
         Args:
             pipeline: Configured ArbitragePipeline instance.
             interval_seconds: Delay between pipeline cycles.
+            on_trade: Async callback invoked for each executed trade pair.
         """
         self.pipeline = pipeline
         self.interval_seconds = interval_seconds
@@ -70,6 +72,7 @@ class PaperTradingSimulator:
         self._orderbook_provider: OrderBookProvider | None = None
         self._winning_trades: int = 0
         self._total_trades: int = 0
+        self._on_trade = on_trade
 
     async def start(
         self,
@@ -120,6 +123,11 @@ class PaperTradingSimulator:
                         )
                         if pnl > 0:
                             self._winning_trades += 1
+                        if self._on_trade is not None:
+                            try:
+                                await self._on_trade(buy_result, sell_result, pnl)
+                            except Exception:
+                                pass
 
                 await asyncio.sleep(self.interval_seconds)
             except asyncio.CancelledError:
@@ -159,10 +167,13 @@ class PaperTradingSimulator:
         return self._running
 
 
-# Type alias for the order book provider callback
+# Type aliases for callbacks
 from typing import Awaitable, Callable
 
-OrderBookProvider = Callable[[], Awaitable[dict[str, "OrderBook"]]]
-
-# Avoid circular import for type hint
 from arbot.models.orderbook import OrderBook  # noqa: E402
+from arbot.models.trade import TradeResult as TradeResultModel  # noqa: E402
+
+OrderBookProvider = Callable[[], Awaitable[dict[str, OrderBook]]]
+OnTradeCallback = Callable[
+    [TradeResultModel, TradeResultModel, float], Awaitable[None]
+]
