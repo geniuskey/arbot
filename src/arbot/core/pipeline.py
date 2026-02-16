@@ -15,7 +15,7 @@ from arbot.detector.triangular import TriangularDetector
 from arbot.execution.base import BaseExecutor, InsufficientBalanceError
 from arbot.logging import get_logger
 from arbot.models.orderbook import OrderBook
-from arbot.models.signal import ArbitrageSignal, SignalStatus
+from arbot.models.signal import ArbitrageSignal, ArbitrageStrategy, SignalStatus
 from arbot.models.trade import TradeResult
 from arbot.risk.manager import RiskManager
 
@@ -157,23 +157,42 @@ class ArbitragePipeline:
             self._stats.total_signals_approved += 1
 
             try:
-                buy_result, sell_result = self.executor.execute(signal)
-                self._stats.total_signals_executed += 1
+                if signal.strategy == ArbitrageStrategy.TRIANGULAR:
+                    tri_results = self.executor.execute_triangular(signal)
+                    self._stats.total_signals_executed += 1
+                    fees = sum(r.fee for r in tri_results)
+                    # PnL: last leg output - first leg input
+                    first = tri_results[0]
+                    last = tri_results[-1]
+                    pnl = (
+                        last.filled_quantity * last.filled_price
+                        - first.filled_quantity * first.filled_price
+                    )
+                    self._stats.total_pnl_usd += pnl
+                    self._stats.total_fees_usd += fees
+                    self.risk_manager.record_trade(pnl)
+                    # Store first and last legs as buy/sell pair for compatibility
+                    self._trade_log.append((signal, first, last))
+                    results.append((first, last))
+                    portfolio = self.executor.get_portfolio()
+                else:
+                    buy_result, sell_result = self.executor.execute(signal)
+                    self._stats.total_signals_executed += 1
 
-                # Calculate PnL from this trade
-                pnl = self._estimate_trade_pnl(buy_result, sell_result)
-                fees = buy_result.fee + sell_result.fee
-                self._stats.total_pnl_usd += pnl
-                self._stats.total_fees_usd += fees
+                    # Calculate PnL from this trade
+                    pnl = self._estimate_trade_pnl(buy_result, sell_result)
+                    fees = buy_result.fee + sell_result.fee
+                    self._stats.total_pnl_usd += pnl
+                    self._stats.total_fees_usd += fees
 
-                # Report to risk manager
-                self.risk_manager.record_trade(pnl)
+                    # Report to risk manager
+                    self.risk_manager.record_trade(pnl)
 
-                self._trade_log.append((signal, buy_result, sell_result))
-                results.append((buy_result, sell_result))
+                    self._trade_log.append((signal, buy_result, sell_result))
+                    results.append((buy_result, sell_result))
 
-                # Refresh portfolio after trade
-                portfolio = self.executor.get_portfolio()
+                    # Refresh portfolio after trade
+                    portfolio = self.executor.get_portfolio()
 
             except (InsufficientBalanceError, ValueError) as e:
                 self._stats.total_signals_failed += 1

@@ -21,10 +21,10 @@ symbols:
 detector:
   spatial:
     enabled: true
-    min_spread_pct: 0.01
+    min_spread_pct: 0.05
     min_depth_usd: 100
     max_latency_ms: 500
-    use_gross_spread: true
+    use_gross_spread: false
 
   triangular:
     enabled: true

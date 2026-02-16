@@ -103,7 +103,7 @@ class SpatialDetector:
             return None
 
         profit: ArbitrageProfit = self._calc.calculate_arbitrage_profit(
-            buy_ob, sell_ob, buy_fee, sell_fee, quantity_usd
+            buy_ob, sell_ob, buy_fee, sell_fee, quantity_usd, buy_maker=True
         )
 
         # Use gross spread for threshold when configured (useful for paper trading
@@ -142,4 +142,5 @@ class SpatialDetector:
             confidence=confidence,
             orderbook_depth_usd=profit.available_depth_usd,
             status=SignalStatus.DETECTED,
+            metadata={"buy_maker": True, "sell_maker": False},
         )

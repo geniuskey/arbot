@@ -118,6 +118,7 @@ class SpreadCalculator:
         buy_fee: TradingFee,
         sell_fee: TradingFee,
         quantity_usd: float,
+        buy_maker: bool = True,
     ) -> ArbitrageProfit:
         """Calculate comprehensive arbitrage profit for a given trade size.
 
@@ -127,9 +128,10 @@ class SpreadCalculator:
         Args:
             buy_ob: Order book of the exchange to buy on.
             sell_ob: Order book of the exchange to sell on.
-            buy_fee: Fee schedule for the buy exchange (taker fee used).
-            sell_fee: Fee schedule for the sell exchange (taker fee used).
+            buy_fee: Fee schedule for the buy exchange.
+            sell_fee: Fee schedule for the sell exchange.
             quantity_usd: Trade size in USD.
+            buy_maker: If True, use maker fee for buy side (limit order).
 
         Returns:
             ArbitrageProfit with all computed fields.
@@ -138,8 +140,9 @@ class SpreadCalculator:
         sell_eff = self.calculate_effective_price(sell_ob, OrderSide.SELL, quantity_usd)
 
         gross_pct = self.calculate_gross_spread(buy_eff, sell_eff)
+        buy_fee_pct = buy_fee.maker_pct if buy_maker else buy_fee.taker_pct
         net_pct = self.calculate_net_spread(
-            buy_eff, sell_eff, buy_fee.taker_pct, sell_fee.taker_pct
+            buy_eff, sell_eff, buy_fee_pct, sell_fee.taker_pct
         )
 
         # Estimated profit: net spread applied to the trade size

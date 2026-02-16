@@ -70,6 +70,7 @@ class PaperTradingSimulator:
         self._stopped_at: datetime | None = None
         self._task: asyncio.Task | None = None
         self._orderbook_provider: OrderBookProvider | None = None
+        self._triangular_provider: TriangularOrderBookProvider | None = None
         self._winning_trades: int = 0
         self._total_trades: int = 0
         self._on_trade = on_trade
@@ -77,13 +78,14 @@ class PaperTradingSimulator:
     async def start(
         self,
         orderbook_provider: OrderBookProvider | None = None,
+        triangular_provider: TriangularOrderBookProvider | None = None,
     ) -> None:
         """Start the simulation loop.
 
         Args:
             orderbook_provider: Callable that returns current order books.
-                If None, uses a no-op provider (useful for testing with
-                manual orderbook updates).
+            triangular_provider: Callable that returns per-exchange multi-symbol
+                order books for triangular arbitrage detection.
         """
         if self._running:
             return
@@ -91,6 +93,7 @@ class PaperTradingSimulator:
         self._running = True
         self._started_at = datetime.now(UTC)
         self._orderbook_provider = orderbook_provider
+        self._triangular_provider = triangular_provider
         self._task = asyncio.create_task(self._run_loop())
 
     async def stop(self) -> None:
@@ -109,6 +112,7 @@ class PaperTradingSimulator:
         """Internal simulation loop."""
         while self._running:
             try:
+                # Spatial arbitrage: per-symbol, multi-exchange orderbooks
                 if self._orderbook_provider is not None:
                     symbol_groups = await self._orderbook_provider()
                 else:
@@ -118,23 +122,41 @@ class PaperTradingSimulator:
                     if not orderbooks:
                         continue
                     results = self.pipeline.run_once(orderbooks)
-                    for buy_result, sell_result in results:
-                        self._total_trades += 1
-                        pnl = (
-                            sell_result.filled_quantity * sell_result.filled_price
-                            - buy_result.filled_quantity * buy_result.filled_price
-                        )
-                        if pnl > 0:
-                            self._winning_trades += 1
-                        if self._on_trade is not None:
-                            try:
-                                await self._on_trade(buy_result, sell_result, pnl)
-                            except Exception:
-                                pass
+                    await self._process_results(results)
+
+                # Triangular arbitrage: per-exchange, multi-symbol orderbooks
+                if self._triangular_provider is not None:
+                    tri_data = await self._triangular_provider()
+                    for exchange_name, symbol_obs in tri_data.items():
+                        if len(symbol_obs) >= 2:
+                            results = self.pipeline.run_once(
+                                orderbooks={},
+                                triangular_exchange=exchange_name,
+                                triangular_orderbooks=symbol_obs,
+                            )
+                            await self._process_results(results)
 
                 await asyncio.sleep(self.interval_seconds)
             except asyncio.CancelledError:
                 break
+
+    async def _process_results(
+        self, results: list[tuple[TradeResultModel, TradeResultModel]]
+    ) -> None:
+        """Process trade results from a pipeline cycle."""
+        for buy_result, sell_result in results:
+            self._total_trades += 1
+            pnl = (
+                sell_result.filled_quantity * sell_result.filled_price
+                - buy_result.filled_quantity * buy_result.filled_price
+            )
+            if pnl > 0:
+                self._winning_trades += 1
+            if self._on_trade is not None:
+                try:
+                    await self._on_trade(buy_result, sell_result, pnl)
+                except Exception:
+                    pass
 
     def get_report(self) -> SimulationReport:
         """Generate a comprehensive simulation report.
@@ -177,6 +199,9 @@ from arbot.models.orderbook import OrderBook  # noqa: E402
 from arbot.models.trade import TradeResult as TradeResultModel  # noqa: E402
 
 OrderBookProvider = Callable[[], Awaitable[list[dict[str, OrderBook]]]]
+TriangularOrderBookProvider = Callable[
+    [], Awaitable[dict[str, dict[str, OrderBook]]]
+]
 OnTradeCallback = Callable[
     [TradeResultModel, TradeResultModel, float], Awaitable[None]
 ]

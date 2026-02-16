@@ -33,8 +33,9 @@ class FillSimulator:
         side: OrderSide,
         quantity: float,
         fee: TradingFee,
+        use_maker_fee: bool = False,
     ) -> TradeResult:
-        """Simulate filling a market order against an order book.
+        """Simulate filling an order against an order book.
 
         For BUY orders, consumes the ask side (ascending prices).
         For SELL orders, consumes the bid side (descending prices).
@@ -43,7 +44,8 @@ class FillSimulator:
             orderbook: The order book to fill against.
             side: BUY or SELL.
             quantity: Quantity of base asset to fill.
-            fee: Trading fee schedule (taker fee is used).
+            fee: Trading fee schedule.
+            use_maker_fee: If True, apply maker fee instead of taker fee.
 
         Returns:
             TradeResult with fill details including VWAP and fees.
@@ -76,7 +78,7 @@ class FillSimulator:
 
         # Fee is charged on the received asset
         # BUY: fee on base asset (received), SELL: fee on quote asset (received)
-        fee_pct = fee.taker_pct / 100
+        fee_pct = (fee.maker_pct if use_maker_fee else fee.taker_pct) / 100
         if side == OrderSide.BUY:
             fee_amount = filled_qty * fee_pct
             fee_asset = orderbook.symbol.split("/")[0]  # base asset
@@ -91,7 +93,7 @@ class FillSimulator:
             exchange=orderbook.exchange,
             symbol=orderbook.symbol,
             side=side,
-            order_type=OrderType.MARKET,
+            order_type=OrderType.LIMIT if use_maker_fee else OrderType.MARKET,
             quantity=quantity,
             price=vwap if vwap > 0 else None,
             status=status,

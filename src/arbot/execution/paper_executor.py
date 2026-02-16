@@ -116,12 +116,14 @@ class PaperExecutor(BaseExecutor):
                 sell_ex, base_asset, quantity, sell_balance
             )
 
-        # Simulate fills
+        # Simulate fills (use maker fee when indicated by signal metadata)
+        buy_maker = (signal.metadata or {}).get("buy_maker", False)
+        sell_maker = (signal.metadata or {}).get("sell_maker", False)
         buy_result = self._simulator.simulate_fill(
-            buy_ob, OrderSide.BUY, quantity, buy_fee
+            buy_ob, OrderSide.BUY, quantity, buy_fee, use_maker_fee=buy_maker
         )
         sell_result = self._simulator.simulate_fill(
-            sell_ob, OrderSide.SELL, quantity, sell_fee
+            sell_ob, OrderSide.SELL, quantity, sell_fee, use_maker_fee=sell_maker
         )
 
         # Update balances for the buy side
@@ -138,6 +140,84 @@ class PaperExecutor(BaseExecutor):
 
         self.trade_history.append((buy_result, sell_result))
         return buy_result, sell_result
+
+    def execute_triangular(
+        self, signal: ArbitrageSignal
+    ) -> list[TradeResult]:
+        """Execute a triangular arbitrage signal as 3 sequential legs.
+
+        Reads path and directions from signal.metadata to determine
+        the trading sequence within a single exchange.
+
+        Args:
+            signal: Triangular signal with metadata["path"] and metadata["directions"].
+
+        Returns:
+            List of 3 TradeResults, one per leg.
+        """
+        exchange = signal.buy_exchange
+        metadata = signal.metadata or {}
+        path: list[str] = metadata.get("path", [])
+        directions: list[str] = metadata.get("directions", [])
+
+        if len(path) != 3 or len(directions) != 3:
+            raise ValueError(f"Invalid triangular path: {path} directions: {directions}")
+
+        fee = self.exchange_fees.get(
+            exchange, TradingFee(maker_pct=0.1, taker_pct=0.1)
+        )
+
+        # Start with the signal's quantity in USD terms
+        current_amount = signal.quantity * signal.buy_price
+        results: list[TradeResult] = []
+
+        for symbol, direction in zip(path, directions):
+            ob_key = f"{exchange}:{symbol}"
+            ob = self.orderbooks.get(ob_key)
+            if ob is None:
+                raise ValueError(f"Missing orderbook: {ob_key}")
+
+            base_asset, quote_asset = symbol.split("/")
+            side = OrderSide.BUY if direction == "buy" else OrderSide.SELL
+
+            if side == OrderSide.BUY:
+                # Spending quote asset to get base asset
+                price = ob.best_ask if ob.asks else 0.0
+                if price <= 0:
+                    raise ValueError(f"No ask price for {symbol}")
+                quantity = current_amount / price
+                balance = self._get_balance(exchange, quote_asset)
+                if balance < current_amount:
+                    raise InsufficientBalanceError(
+                        exchange, quote_asset, current_amount, balance
+                    )
+            else:
+                # Spending base asset to get quote asset
+                quantity = current_amount
+                balance = self._get_balance(exchange, base_asset)
+                if balance < quantity:
+                    raise InsufficientBalanceError(
+                        exchange, base_asset, quantity, balance
+                    )
+
+            result = self._simulator.simulate_fill(ob, side, quantity, fee)
+            results.append(result)
+
+            # Update balances
+            if side == OrderSide.BUY:
+                cost = result.filled_quantity * result.filled_price
+                self._adjust_balance(exchange, quote_asset, -cost)
+                received = result.filled_quantity - result.fee
+                self._adjust_balance(exchange, base_asset, received)
+                current_amount = received
+            else:
+                self._adjust_balance(exchange, base_asset, -result.filled_quantity)
+                proceeds = result.filled_quantity * result.filled_price
+                received = proceeds - result.fee
+                self._adjust_balance(exchange, quote_asset, received)
+                current_amount = received
+
+        return results
 
     def get_portfolio(self) -> PortfolioSnapshot:
         """Return current virtual portfolio snapshot.

@@ -158,13 +158,14 @@ class TestCreateConnectors:
 
     def test_skips_unregistered_exchange(self) -> None:
         config = AppConfig(
-            exchanges_enabled=["okx", "binance"],
+            exchanges_enabled=["okx", "binance", "nonexistent"],
             exchange_configs={},
         )
         connectors = _create_connectors(config)
-        # Only binance has a connector class
-        assert len(connectors) == 1
-        assert connectors[0].exchange_name == "binance"
+        # okx and binance have connector classes, nonexistent does not
+        assert len(connectors) == 2
+        exchange_names = {c.exchange_name for c in connectors}
+        assert "nonexistent" not in exchange_names
 
     def test_empty_enabled_list(self) -> None:
         config = AppConfig(exchanges_enabled=[])

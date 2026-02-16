@@ -196,10 +196,10 @@ class TestArbitrageProfit:
         assert profit.sell_effective_price == pytest.approx(50300.0)
         # gross = (50300-50000)/50000 * 100 = 0.6%
         assert profit.gross_spread_pct == pytest.approx(0.6)
-        # net = 0.6 - 0.04 - 0.04 = 0.52%
-        assert profit.net_spread_pct == pytest.approx(0.52)
-        # profit = 0.52/100 * 50000 = 260
-        assert profit.estimated_profit_usd == pytest.approx(260.0)
+        # net = 0.6 - 0.02(buy maker) - 0.04(sell taker) = 0.54%
+        assert profit.net_spread_pct == pytest.approx(0.54)
+        # profit = 0.54/100 * 50000 = 270
+        assert profit.estimated_profit_usd == pytest.approx(270.0)
         assert profit.available_depth_usd > 0
         assert profit.is_profitable is True
 

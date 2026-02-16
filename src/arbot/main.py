@@ -18,12 +18,14 @@ from arbot.alerts.notifier_protocol import Notifier
 from arbot.config import AppConfig, ExecutionMode, ExchangeConfig, load_config
 from arbot.connectors.base import BaseConnector
 from arbot.connectors.binance import BinanceConnector
+from arbot.connectors.bybit import BybitConnector
 from arbot.connectors.okx import OKXConnector
 from arbot.connectors.upbit import UpbitConnector
 from arbot.core.collector import PriceCollector
 from arbot.core.pipeline import ArbitragePipeline
 from arbot.core.simulator import PaperTradingSimulator
 from arbot.detector.spatial import SpatialDetector
+from arbot.detector.triangular import TriangularDetector
 from arbot.execution.paper_executor import PaperExecutor
 from arbot.logging import get_logger, setup_logging
 from arbot.models.config import ExchangeInfo, RiskConfig, TradingFee
@@ -45,6 +47,7 @@ except ImportError:
 # Mapping of exchange names to connector classes
 _CONNECTOR_CLASSES: dict[str, type[BaseConnector]] = {
     "binance": BinanceConnector,
+    "bybit": BybitConnector,
     "okx": OKXConnector,
     "upbit": UpbitConnector,
 }
@@ -209,11 +212,18 @@ async def run(
     redis_url = config.database.redis.url
     redis_cache = RedisCache(redis_url=redis_url)
 
+    # Collect all required symbols (base + triangular intermediate pairs)
+    all_symbols_set: set[str] = set(config.symbols)
+    if config.detector.triangular.enabled:
+        for path in config.detector.triangular.paths:
+            all_symbols_set.update(path)
+    all_symbols = sorted(all_symbols_set)
+
     # Create price collector
     collector = PriceCollector(
         connectors=connectors,
         redis_cache=redis_cache,
-        symbols=config.symbols,
+        symbols=all_symbols,
     )
 
     # Build exchange fees
@@ -229,6 +239,17 @@ async def run(
             use_gross_spread=config.detector.spatial.use_gross_spread,
         )
         logger.info("spatial_detector_enabled")
+
+    # Create triangular detector
+    triangular_detector = None
+    if config.detector.triangular.enabled:
+        # Use fees from the first available exchange as default
+        first_fee = next(iter(exchange_fees.values()), TradingFee(maker_pct=0.1, taker_pct=0.1))
+        triangular_detector = TriangularDetector(
+            min_profit_pct=config.detector.triangular.min_profit_pct,
+            default_fee=first_fee,
+        )
+        logger.info("triangular_detector_enabled")
 
     # Create risk manager
     risk_config = RiskConfig(
@@ -254,6 +275,7 @@ async def run(
         executor=executor,
         risk_manager=risk_manager,
         spatial_detector=spatial_detector,
+        triangular_detector=triangular_detector,
     )
 
     # Create simulator with orderbook provider from Redis
@@ -269,6 +291,24 @@ async def run(
             if len(obs) >= 2:
                 result.append(obs)
         return result
+
+    # Triangular orderbook provider: per-exchange, multi-symbol
+    triangular_provider = None
+    if config.detector.triangular.enabled:
+        async def _triangular_provider() -> dict[str, dict]:
+            """Fetch orderbooks per exchange for triangular detection."""
+            result: dict[str, dict] = {}
+            for c in connectors:
+                exchange_obs = {}
+                for symbol in all_symbols:
+                    ob = await redis_cache.get_orderbook(c.exchange_name, symbol)
+                    if ob is not None:
+                        exchange_obs[symbol] = ob
+                if len(exchange_obs) >= 3:
+                    result[c.exchange_name] = exchange_obs
+            return result
+
+        triangular_provider = _triangular_provider
 
     # Setup notification channels
     notifiers: list[Notifier] = []
@@ -380,7 +420,10 @@ async def run(
         logger.info("price_collector_started")
 
         # Start simulator
-        await simulator.start(orderbook_provider=orderbook_provider)
+        await simulator.start(
+            orderbook_provider=orderbook_provider,
+            triangular_provider=triangular_provider,
+        )
         logger.info(
             "simulator_started",
             mode=config.system.execution_mode.value,

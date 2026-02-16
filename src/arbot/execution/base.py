@@ -30,6 +30,19 @@ class BaseExecutor(ABC):
             InsufficientBalanceError: If balance is insufficient for the trade.
         """
 
+    def execute_triangular(
+        self, signal: ArbitrageSignal
+    ) -> list[TradeResult]:
+        """Execute a triangular arbitrage signal as a 3-leg trade.
+
+        Args:
+            signal: Triangular arbitrage signal with path/directions in metadata.
+
+        Returns:
+            List of 3 TradeResults, one per leg.
+        """
+        raise NotImplementedError("Triangular execution not supported")
+
     @abstractmethod
     def get_portfolio(self) -> PortfolioSnapshot:
         """Return a snapshot of the current portfolio state.
