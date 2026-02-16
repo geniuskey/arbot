@@ -92,8 +92,10 @@ services:
     env_file:
       - .env
     environment:
-      - ARBOT_DB_HOST=postgres
-      - ARBOT_REDIS_HOST=redis
+      - ARBOT_DATABASE__POSTGRES__HOST=postgres
+      - ARBOT_DATABASE__POSTGRES__PASSWORD=${POSTGRES_PASSWORD}
+      - ARBOT_DATABASE__REDIS__HOST=redis
+      - ARBOT_DATABASE__REDIS__PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ../../configs:/app/configs:ro
       - arbot_logs:/app/logs
