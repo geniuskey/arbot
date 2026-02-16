@@ -260,6 +260,8 @@ class TelegramBotService:
 
         # Config thresholds
         lines.append("\n-- Thresholds --")
+        spread_mode = "gross" if self._config.detector.spatial.use_gross_spread else "net"
+        lines.append(f"  spread_mode: {spread_mode}")
         lines.append(f"  min_spread_pct: {self._config.detector.spatial.min_spread_pct}%")
         lines.append(f"  min_depth_usd: ${self._config.detector.spatial.min_depth_usd}")
 

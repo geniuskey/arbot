@@ -37,6 +37,7 @@ class SpatialDetectorConfig(BaseModel):
     min_spread_pct: float = 0.25
     min_depth_usd: float = 1000.0
     max_latency_ms: int = 500
+    use_gross_spread: bool = False
 
 
 class TriangularDetectorConfig(BaseModel):

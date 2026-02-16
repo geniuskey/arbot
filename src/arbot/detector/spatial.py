@@ -33,11 +33,13 @@ class SpatialDetector:
         min_depth_usd: float = 1000.0,
         exchange_fees: dict[str, TradingFee] | None = None,
         default_quantity_usd: float = 1000.0,
+        use_gross_spread: bool = False,
     ) -> None:
         self.min_spread_pct = min_spread_pct
         self.min_depth_usd = min_depth_usd
         self.exchange_fees: dict[str, TradingFee] = exchange_fees or {}
         self.default_quantity_usd = default_quantity_usd
+        self.use_gross_spread = use_gross_spread
         self._calc = SpreadCalculator()
 
     def detect(
@@ -104,18 +106,22 @@ class SpatialDetector:
             buy_ob, sell_ob, buy_fee, sell_fee, quantity_usd
         )
 
-        if profit.net_spread_pct < self.min_spread_pct:
+        # Use gross spread for threshold when configured (useful for paper trading
+        # where fees make net spread always negative on tier-1 exchanges)
+        threshold_spread = profit.gross_spread_pct if self.use_gross_spread else profit.net_spread_pct
+
+        if threshold_spread < self.min_spread_pct:
             return None
 
         if profit.available_depth_usd < self.min_depth_usd:
             return None
 
-        if profit.estimated_profit_usd <= 0:
+        if not self.use_gross_spread and profit.estimated_profit_usd <= 0:
             return None
 
-        # Confidence based on how much net spread exceeds the minimum
+        # Confidence based on how much spread exceeds the minimum
         # and how much depth is available relative to trade size
-        spread_ratio = min(profit.net_spread_pct / self.min_spread_pct, 3.0) / 3.0
+        spread_ratio = min(threshold_spread / self.min_spread_pct, 3.0) / 3.0
         depth_ratio = min(profit.available_depth_usd / quantity_usd, 10.0) / 10.0
         confidence = min((spread_ratio + depth_ratio) / 2, 1.0)
 

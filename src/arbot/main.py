@@ -207,6 +207,7 @@ async def run(
             min_spread_pct=config.detector.spatial.min_spread_pct,
             min_depth_usd=config.detector.spatial.min_depth_usd,
             exchange_fees=exchange_fees,
+            use_gross_spread=config.detector.spatial.use_gross_spread,
         )
         logger.info("spatial_detector_enabled")
 
