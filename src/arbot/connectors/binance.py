@@ -473,7 +473,7 @@ class BinanceConnector(BaseConnector):
             return
 
         self._ws_manager = WebSocketManager(
-            url=_WS_BASE_URL,
+            url=_WS_COMBINED_URL,
             on_message=self._handle_ws_message,
             reconnect_delay=1.0,
             max_reconnect_delay=60.0,

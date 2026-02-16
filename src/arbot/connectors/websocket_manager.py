@@ -48,6 +48,7 @@ class WebSocketManager:
         self._should_reconnect = True
         self._current_delay = reconnect_delay
         self._subscribed_channels: set[str] = set()
+        self._msg_id: int = 0
 
         self._receive_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -153,9 +154,11 @@ class WebSocketManager:
         """
         self._subscribed_channels.update(channels)
         if self._is_connected and self._ws is not None:
+            self._msg_id += 1
             subscribe_msg = {
                 "method": "SUBSCRIBE",
                 "params": channels,
+                "id": self._msg_id,
             }
             await self.send(subscribe_msg)
             self._logger.info("websocket_subscribed", channels=channels)

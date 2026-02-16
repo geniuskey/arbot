@@ -134,11 +134,9 @@ class PriceCollector:
 
         await connector.connect()
 
-        # Subscribe to order books and trades concurrently
-        await asyncio.gather(
-            connector.subscribe_orderbook(self._symbols, depth=self._orderbook_depth),
-            connector.subscribe_trades(self._symbols),
-        )
+        # Subscribe sequentially to avoid race condition in _ensure_ws_connected
+        await connector.subscribe_orderbook(self._symbols, depth=self._orderbook_depth)
+        await connector.subscribe_trades(self._symbols)
 
         self._logger.info(
             "exchange_subscribed",
