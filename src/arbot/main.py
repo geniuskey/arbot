@@ -17,6 +17,7 @@ from arbot.alerts.notifier_protocol import Notifier
 from arbot.config import AppConfig, ExecutionMode, ExchangeConfig, load_config
 from arbot.connectors.base import BaseConnector
 from arbot.connectors.binance import BinanceConnector
+from arbot.connectors.okx import OKXConnector
 from arbot.connectors.upbit import UpbitConnector
 from arbot.core.collector import PriceCollector
 from arbot.core.pipeline import ArbitragePipeline
@@ -42,6 +43,7 @@ except ImportError:
 # Mapping of exchange names to connector classes
 _CONNECTOR_CLASSES: dict[str, type[BaseConnector]] = {
     "binance": BinanceConnector,
+    "okx": OKXConnector,
     "upbit": UpbitConnector,
 }
 
@@ -102,10 +104,16 @@ def _create_connectors(config: AppConfig) -> list[BaseConnector]:
         api_key = os.environ.get(f"ARBOT_{exchange_name.upper()}_API_KEY", "")
         api_secret = os.environ.get(f"ARBOT_{exchange_name.upper()}_API_SECRET", "")
 
+        extra_kwargs: dict[str, str] = {}
+        passphrase = os.environ.get(f"ARBOT_{exchange_name.upper()}_PASSPHRASE", "")
+        if passphrase:
+            extra_kwargs["passphrase"] = passphrase
+
         connector = connector_cls(
             config=info,
             api_key=api_key,
             api_secret=api_secret,
+            **extra_kwargs,
         )
         connectors.append(connector)
         logger.info(
