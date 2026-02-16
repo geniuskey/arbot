@@ -13,6 +13,7 @@ from arbot.detector.spatial import SpatialDetector
 from arbot.detector.statistical import StatisticalDetector
 from arbot.detector.triangular import TriangularDetector
 from arbot.execution.base import BaseExecutor, InsufficientBalanceError
+from arbot.logging import get_logger
 from arbot.models.orderbook import OrderBook
 from arbot.models.signal import ArbitrageSignal, SignalStatus
 from arbot.models.trade import TradeResult
@@ -86,6 +87,7 @@ class ArbitragePipeline:
         self.risk_manager = risk_manager
         self._stats = PipelineStats()
         self._trade_log: list[tuple[ArbitrageSignal, TradeResult, TradeResult]] = []
+        self._logger = get_logger("pipeline")
 
     def run_once(
         self,
@@ -173,8 +175,15 @@ class ArbitragePipeline:
                 # Refresh portfolio after trade
                 portfolio = self.executor.get_portfolio()
 
-            except (InsufficientBalanceError, ValueError):
+            except (InsufficientBalanceError, ValueError) as e:
                 self._stats.total_signals_failed += 1
+                self._logger.warning(
+                    "signal_execution_failed",
+                    symbol=signal.symbol,
+                    buy_exchange=signal.buy_exchange,
+                    sell_exchange=signal.sell_exchange,
+                    error=str(e),
+                )
 
         return results
 

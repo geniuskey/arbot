@@ -149,7 +149,8 @@ def _build_exchange_fees(config: AppConfig) -> dict[str, TradingFee]:
 def _build_initial_balances(config: AppConfig) -> dict[str, dict[str, float]]:
     """Build initial paper trading balances for all enabled exchanges.
 
-    Assigns a default balance of 10,000 USDT per exchange for paper trading.
+    Cross-exchange arbitrage requires holding both base and quote assets
+    on each exchange. Allocates USDT plus base asset inventory per symbol.
 
     Args:
         config: Application configuration.
@@ -157,9 +158,27 @@ def _build_initial_balances(config: AppConfig) -> dict[str, dict[str, float]]:
     Returns:
         Mapping of exchange name to {asset: amount}.
     """
+    # Approximate USD value per base asset for initial inventory sizing
+    _BASE_ALLOC_USD = 5_000.0
+    _APPROX_PRICES: dict[str, float] = {
+        "BTC": 97_000.0,
+        "ETH": 2_700.0,
+        "SOL": 170.0,
+        "XRP": 2.5,
+        "DOGE": 0.25,
+    }
+
+    base_assets: dict[str, float] = {}
+    for symbol in config.symbols:
+        base = symbol.split("/")[0]
+        price = _APPROX_PRICES.get(base, 100.0)
+        base_assets[base] = _BASE_ALLOC_USD / price
+
     balances: dict[str, dict[str, float]] = {}
     for name in config.exchanges_enabled:
-        balances[name] = {"USDT": 10_000.0}
+        exchange_bal: dict[str, float] = {"USDT": 10_000.0}
+        exchange_bal.update(base_assets)
+        balances[name] = exchange_bal
     return balances
 
 
