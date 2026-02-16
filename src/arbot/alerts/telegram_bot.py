@@ -1,12 +1,11 @@
 """Interactive Telegram bot for ArBot status queries.
 
-Provides command handlers (/status, /stats, /balance, /trades, /help)
+Provides command handlers (/status, /stats, /balance, /trades, /debug, /help)
 so the user can query ArBot state directly from Telegram.
 """
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -18,8 +17,10 @@ from arbot.logging import get_logger
 if TYPE_CHECKING:
     from arbot.config import AppConfig
     from arbot.connectors.base import BaseConnector
+    from arbot.core.collector import PriceCollector
     from arbot.core.simulator import PaperTradingSimulator
     from arbot.execution.paper_executor import PaperExecutor
+    from arbot.storage.redis_cache import RedisCache
 
 logger = get_logger("telegram_bot")
 
@@ -34,6 +35,8 @@ class TelegramBotService:
         executor: Paper executor instance.
         connectors: List of exchange connectors.
         config: Application configuration.
+        redis_cache: Redis cache for orderbook queries.
+        collector: Price collector for stats.
     """
 
     def __init__(
@@ -44,12 +47,16 @@ class TelegramBotService:
         executor: PaperExecutor,
         connectors: list[BaseConnector],
         config: AppConfig,
+        redis_cache: RedisCache | None = None,
+        collector: PriceCollector | None = None,
     ) -> None:
         self._chat_id = str(chat_id)
         self._simulator = simulator
         self._executor = executor
         self._connectors = connectors
         self._config = config
+        self._redis_cache = redis_cache
+        self._collector = collector
         self._started_at = datetime.now(UTC)
 
         self._app = (
@@ -61,6 +68,7 @@ class TelegramBotService:
         self._app.add_handler(CommandHandler("stats", self._cmd_stats))
         self._app.add_handler(CommandHandler("balance", self._cmd_balance))
         self._app.add_handler(CommandHandler("trades", self._cmd_trades))
+        self._app.add_handler(CommandHandler("debug", self._cmd_debug))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
         self._app.add_handler(CommandHandler("start", self._cmd_help))
 
@@ -190,6 +198,77 @@ class TelegramBotService:
         assert update.message is not None
         await update.message.reply_text("\n".join(lines))
 
+    async def _cmd_debug(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        if not self._is_authorized(update):
+            return
+
+        lines = ["[Debug Info]"]
+
+        # Collector stats
+        if self._collector is not None:
+            status = self._collector.get_status()
+            lines.append("\n-- Collector --")
+            for ex_name, ex_status in status.get("exchanges", {}).items():
+                lines.append(
+                    f"  {ex_name}: "
+                    f"connected={ex_status['connected']} "
+                    f"ob={ex_status['orderbook_count']} "
+                    f"trades={ex_status['trade_count']}"
+                )
+
+        # Redis orderbook check
+        if self._redis_cache is not None:
+            lines.append("\n-- Redis Orderbooks --")
+            for symbol in self._config.symbols[:3]:
+                try:
+                    obs = await self._redis_cache.get_all_orderbooks(symbol)
+                    if not obs:
+                        lines.append(f"  {symbol}: (empty)")
+                        continue
+                    ex_names = list(obs.keys())
+                    lines.append(f"  {symbol}: {len(obs)} exchanges {ex_names}")
+
+                    # Show best bid/ask per exchange and spread between them
+                    prices = []
+                    for ex, ob in obs.items():
+                        best_ask = ob.asks[0].price if ob.asks else 0
+                        best_bid = ob.bids[0].price if ob.bids else 0
+                        lines.append(
+                            f"    {ex}: bid={best_bid:,.2f} ask={best_ask:,.2f}"
+                        )
+                        if best_bid > 0 and best_ask > 0:
+                            prices.append((ex, best_bid, best_ask))
+
+                    # Cross-exchange spread
+                    if len(prices) >= 2:
+                        for i in range(len(prices)):
+                            for j in range(len(prices)):
+                                if i == j:
+                                    continue
+                                buy_ex, _, buy_ask = prices[i]
+                                sell_ex, sell_bid, _ = prices[j]
+                                if buy_ask > 0:
+                                    spread = (sell_bid - buy_ask) / buy_ask * 100
+                                    lines.append(
+                                        f"    {buy_ex}->{sell_ex}: "
+                                        f"spread={spread:+.4f}%"
+                                    )
+                except Exception as e:
+                    lines.append(f"  {symbol}: error={e}")
+
+        # Config thresholds
+        lines.append("\n-- Thresholds --")
+        lines.append(f"  min_spread_pct: {self._config.detector.spatial.min_spread_pct}%")
+        lines.append(f"  min_depth_usd: ${self._config.detector.spatial.min_depth_usd}")
+
+        assert update.message is not None
+        text = "\n".join(lines)
+        if len(text) > 4096:
+            text = text[:4093] + "..."
+        await update.message.reply_text(text)
+
     async def _cmd_help(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
@@ -202,6 +281,7 @@ class TelegramBotService:
             "/stats   - Pipeline statistics\n"
             "/balance - Portfolio balance\n"
             "/trades  - Recent trades (last 5)\n"
+            "/debug   - Orderbook & collector debug\n"
             "/help    - This message"
         )
         assert update.message is not None

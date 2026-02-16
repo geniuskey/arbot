@@ -304,6 +304,8 @@ async def run(
             executor=executor,
             connectors=connectors,
             config=config,
+            redis_cache=redis_cache,
+            collector=collector,
         )
 
     # Discord bot (if configured)
