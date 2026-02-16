@@ -287,6 +287,20 @@ async def run(
         pipeline=pipeline, interval_seconds=1.0, on_trade=_on_trade,
     )
 
+    # Telegram interactive bot (if configured)
+    telegram_bot_service: TelegramBotService | None = None
+    if config.alerts.telegram.enabled and config.alerts.telegram.bot_token:
+        from arbot.alerts.telegram_bot import TelegramBotService
+
+        telegram_bot_service = TelegramBotService(
+            bot_token=config.alerts.telegram.bot_token,
+            chat_id=config.alerts.telegram.chat_id,
+            simulator=simulator,
+            executor=executor,
+            connectors=connectors,
+            config=config,
+        )
+
     # Discord bot (if configured)
     discord_notifier: DiscordNotifier | None = None
     if HAS_DISCORD and config.alerts.discord.enabled and config.alerts.discord.bot_token:
@@ -358,6 +372,10 @@ async def run(
                 f"Symbols: {len(config.symbols)}",
             )
 
+        # Start Telegram interactive bot
+        if telegram_bot_service is not None:
+            await telegram_bot_service.start()
+
         # Start Discord bot
         if discord_bot is not None:
             discord_task = asyncio.create_task(discord_bot.start_bot())
@@ -370,6 +388,10 @@ async def run(
         _signal_handler()
     finally:
         logger.info("arbot_shutting_down")
+
+        # Stop Telegram interactive bot
+        if telegram_bot_service is not None:
+            await telegram_bot_service.stop()
 
         # Stop Discord bot
         if discord_bot is not None:
