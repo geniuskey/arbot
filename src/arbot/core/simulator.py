@@ -109,11 +109,14 @@ class PaperTradingSimulator:
         """Internal simulation loop."""
         while self._running:
             try:
-                orderbooks = {}
                 if self._orderbook_provider is not None:
-                    orderbooks = await self._orderbook_provider()
+                    symbol_groups = await self._orderbook_provider()
+                else:
+                    symbol_groups = []
 
-                if orderbooks:
+                for orderbooks in symbol_groups:
+                    if not orderbooks:
+                        continue
                     results = self.pipeline.run_once(orderbooks)
                     for buy_result, sell_result in results:
                         self._total_trades += 1
@@ -173,7 +176,7 @@ from typing import Awaitable, Callable
 from arbot.models.orderbook import OrderBook  # noqa: E402
 from arbot.models.trade import TradeResult as TradeResultModel  # noqa: E402
 
-OrderBookProvider = Callable[[], Awaitable[dict[str, OrderBook]]]
+OrderBookProvider = Callable[[], Awaitable[list[dict[str, OrderBook]]]]
 OnTradeCallback = Callable[
     [TradeResultModel, TradeResultModel, float], Awaitable[None]
 ]

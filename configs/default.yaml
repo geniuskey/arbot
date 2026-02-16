@@ -21,8 +21,8 @@ symbols:
 detector:
   spatial:
     enabled: true
-    min_spread_pct: 0.25
-    min_depth_usd: 1000
+    min_spread_pct: 0.05
+    min_depth_usd: 500
     max_latency_ms: 500
 
   triangular:

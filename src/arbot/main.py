@@ -237,13 +237,18 @@ async def run(
     )
 
     # Create simulator with orderbook provider from Redis
-    async def orderbook_provider() -> dict:
-        """Fetch latest orderbooks from Redis for all enabled symbols."""
-        all_obs: dict = {}
+    async def orderbook_provider() -> list[dict]:
+        """Fetch latest orderbooks from Redis, one dict per symbol.
+
+        Returns a list of dicts, each mapping exchange name to OrderBook
+        for a single symbol. Only includes symbols with 2+ exchange data.
+        """
+        result: list[dict] = []
         for symbol in config.symbols:
             obs = await redis_cache.get_all_orderbooks(symbol)
-            all_obs.update(obs)
-        return all_obs
+            if len(obs) >= 2:
+                result.append(obs)
+        return result
 
     # Setup notification channels
     notifiers: list[Notifier] = []
