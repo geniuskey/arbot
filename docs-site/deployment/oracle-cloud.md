@@ -107,7 +107,7 @@ ssh ubuntu@<VM_PUBLIC_IP>
 git clone https://github.com/geniuskey/arbot.git ~/arbot
 cd ~/arbot
 
-# 시스템 패키지 설치 (Python, PostgreSQL, Redis, Prometheus, Grafana)
+# 시스템 패키지 설치 (uv, Python 3.12, PostgreSQL, Redis, Prometheus, Grafana)
 chmod +x deploy/oracle-cloud/setup.sh
 ./deploy/oracle-cloud/setup.sh
 ```
@@ -115,7 +115,6 @@ chmod +x deploy/oracle-cloud/setup.sh
 ## Step 3: 환경 변수 설정
 
 ```bash
-cd ~/arbot/deploy/oracle-cloud
 cp .env.example .env
 nano .env
 ```
@@ -124,7 +123,7 @@ nano .env
 
 ```env
 POSTGRES_PASSWORD=<strong_password>
-REDIS_PASSWORD=<strong_password>
+ARBOT_DATABASE__POSTGRES__PASSWORD=<strong_password>
 ```
 
 ::: tip 비밀번호 생성
@@ -136,15 +135,13 @@ openssl rand -base64 24
 ## Step 4: ArBot 설치
 
 ```bash
-cd ~/arbot
 chmod +x deploy/oracle-cloud/install.sh
 ./deploy/oracle-cloud/install.sh
 ```
 
 이 스크립트가 자동으로:
 - PostgreSQL DB/유저 생성
-- Redis 비밀번호 설정
-- Python venv 생성 + 패키지 설치
+- `uv venv` + `uv pip install` (pip 대비 10-100x 빠름)
 - systemd 서비스 등록
 
 ## Step 5: 시작 및 확인
@@ -188,13 +185,10 @@ systemctl status arbot postgresql redis-server prometheus grafana-server
 ## 업데이트
 
 ```bash
-cd ~/arbot
-git pull
-.venv/bin/pip install .
-sudo systemctl restart arbot
+cd ~/arbot && git pull && uv pip install --python .venv/bin/python . && sudo systemctl restart arbot
 ```
 
-3줄로 끝. Docker rebuild 대비 수초 만에 완료.
+1줄로 끝. uv는 의존성 설치가 수초 만에 완료.
 
 ## 자동 재시작
 

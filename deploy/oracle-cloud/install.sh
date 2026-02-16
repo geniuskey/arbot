@@ -17,22 +17,23 @@ fi
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
+# Ensure uv is on PATH
+export PATH="$HOME/.local/bin:$PATH"
+
 echo "=== ArBot Install ==="
 
 # --- 1. PostgreSQL DB setup ---
-echo "[1/4] Configuring PostgreSQL..."
+echo "[1/3] Configuring PostgreSQL..."
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='arbot'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE USER arbot WITH PASSWORD '${POSTGRES_PASSWORD}';"
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='arbot'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE DATABASE arbot OWNER arbot;"
 
 # --- 2. Python venv + install ---
-echo "[2/3] Setting up Python environment..."
+echo "[2/3] Setting up Python environment with uv..."
 cd "$ARBOT_DIR"
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install .
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python .
 
 # --- 3. Systemd service ---
 echo "[3/3] Installing systemd service..."
@@ -68,5 +69,5 @@ echo "  sudo systemctl restart arbot   # restart"
 echo "  journalctl -u arbot -f         # logs"
 echo ""
 echo "Update:"
-echo "  cd $ARBOT_DIR && git pull && .venv/bin/pip install . && sudo systemctl restart arbot"
+echo "  cd $ARBOT_DIR && git pull && uv pip install --python .venv/bin/python . && sudo systemctl restart arbot"
 echo ""

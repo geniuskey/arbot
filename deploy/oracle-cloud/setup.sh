@@ -16,12 +16,13 @@ echo "=== ArBot Oracle Cloud Setup ==="
 echo "[1/8] System update..."
 sudo apt-get update && sudo apt-get upgrade -y
 
-# --- 2. Python 3.12 ---
-echo "[2/8] Installing Python 3.12..."
-sudo apt-get install -y software-properties-common
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-get update
-sudo apt-get install -y python3.12 python3.12-venv python3.12-dev gcc
+# --- 2. uv + Python 3.12 ---
+echo "[2/8] Installing uv..."
+if ! command -v uv &> /dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+sudo apt-get install -y gcc
 
 # --- 3. PostgreSQL 16 ---
 echo "[3/8] Installing PostgreSQL 16..."
