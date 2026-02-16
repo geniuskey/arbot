@@ -5,43 +5,73 @@ set -euo pipefail
 # ArBot - Oracle Cloud Always Free ARM VM Setup Script
 # Target: Ubuntu 22.04+ ARM64 (Ampere A1)
 # Resources: 4 OCPU, 24GB RAM, 200GB Block Volume
+#
+# Installs: Python 3.12, PostgreSQL 16, Redis 7, Prometheus, Grafana
+# No Docker required - direct systemd deployment
 # =============================================================================
 
 echo "=== ArBot Oracle Cloud Setup ==="
 
 # --- 1. System Update ---
-echo "[1/6] System update..."
+echo "[1/8] System update..."
 sudo apt-get update && sudo apt-get upgrade -y
 
-# --- 2. Install Docker ---
-echo "[2/6] Installing Docker..."
-if ! command -v docker &> /dev/null; then
-    curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker "$USER"
-    echo "Docker installed. Re-login required for group changes."
+# --- 2. Python 3.12 ---
+echo "[2/8] Installing Python 3.12..."
+sudo apt-get install -y software-properties-common
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv python3.12-dev gcc
+
+# --- 3. PostgreSQL 16 ---
+echo "[3/8] Installing PostgreSQL 16..."
+if ! command -v psql &> /dev/null; then
+    sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+    sudo apt-get update
+    sudo apt-get install -y postgresql-16
 fi
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
 
-# --- 3. Install Docker Compose Plugin ---
-echo "[3/6] Installing Docker Compose..."
-sudo apt-get install -y docker-compose-plugin
+# --- 4. Redis 7 ---
+echo "[4/8] Installing Redis..."
+if ! command -v redis-server &> /dev/null; then
+    sudo apt-get install -y redis-server
+fi
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
 
-# --- 4. Firewall Setup (iptables) ---
-echo "[4/6] Configuring firewall..."
-# Oracle Cloud uses iptables, not ufw
-# Allow SSH (22), Grafana (3000), ArBot Dashboard (8080)
+# --- 5. Prometheus ---
+echo "[5/8] Installing Prometheus..."
+if ! command -v prometheus &> /dev/null; then
+    sudo apt-get install -y prometheus
+fi
+sudo systemctl enable prometheus
+sudo systemctl start prometheus
+
+# --- 6. Grafana ---
+echo "[6/8] Installing Grafana..."
+if ! command -v grafana-server &> /dev/null; then
+    sudo apt-get install -y apt-transport-https
+    curl -fsSL https://apt.grafana.com/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/grafana.gpg
+    echo "deb https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+    sudo apt-get update
+    sudo apt-get install -y grafana
+fi
+sudo systemctl enable grafana-server
+sudo systemctl start grafana-server
+
+# --- 7. Firewall ---
+echo "[7/8] Configuring firewall..."
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 3000 -j ACCEPT
 sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
 sudo netfilter-persistent save 2>/dev/null || true
 
-echo "NOTE: Also open ports 3000, 8080 in OCI Security List (VCN > Subnet > Security List > Ingress Rules)"
+echo "NOTE: Also open ports 3000, 8080 in OCI Security List"
 
-# --- 5. Create ArBot Directory ---
-echo "[5/6] Setting up ArBot directory..."
-ARBOT_DIR="$HOME/arbot"
-mkdir -p "$ARBOT_DIR"
-
-# --- 6. Swap (optional, safety net) ---
-echo "[6/6] Configuring swap..."
+# --- 8. Swap ---
+echo "[8/8] Configuring swap..."
 if [ ! -f /swapfile ]; then
     sudo fallocate -l 4G /swapfile
     sudo chmod 600 /swapfile
@@ -50,16 +80,14 @@ if [ ! -f /swapfile ]; then
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 fi
 
+# --- Setup ArBot ---
 echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Log out and back in (for docker group)"
-echo "  2. cd $ARBOT_DIR"
-echo "  3. git clone https://github.com/geniuskey/arbot.git ."
-echo "  4. cp deploy/oracle-cloud/.env.example .env"
-echo "  5. Edit .env with your API keys"
-echo "  6. docker compose -f deploy/oracle-cloud/docker-compose.yml up -d"
-echo "  7. Open OCI Security List ports: 3000 (Grafana), 8080 (Dashboard)"
+echo "  1. cd ~/arbot"
+echo "  2. cp deploy/oracle-cloud/.env.example deploy/oracle-cloud/.env"
+echo "  3. Edit .env with your API keys"
+echo "  4. chmod +x deploy/oracle-cloud/install.sh"
+echo "  5. ./deploy/oracle-cloud/install.sh"
 echo ""
-echo "Monitor: docker compose -f deploy/oracle-cloud/docker-compose.yml logs -f arbot"

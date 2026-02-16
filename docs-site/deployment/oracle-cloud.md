@@ -7,7 +7,7 @@ Oracle Cloud Always Free 티어를 활용하여 ArBot을 무료로 운영하는 
 | 리소스 | 제공량 | ArBot 사용 |
 |--------|--------|-----------|
 | **VM (ARM)** | Ampere A1: 4 OCPU, 24GB RAM | ArBot + DB 전체 구동 |
-| **Boot Volume** | 200GB | OS + Docker 이미지 |
+| **Boot Volume** | 200GB | OS + 데이터 |
 | **네트워크** | 월 10TB 아웃바운드 | WebSocket 트래픽 |
 | **기간** | 영구 무료 | - |
 
@@ -48,15 +48,6 @@ cat ~/.ssh/id_ed25519.pub
 ssh-keygen -t ed25519 -C "arbot"
 cat ~/.ssh/id_ed25519.pub
 ```
-
-### 기존 키가 있는 경우
-
-```bash
-# 이미 키가 있는지 확인
-ls ~/.ssh/id_ed25519.pub 2>/dev/null || ls ~/.ssh/id_rsa.pub 2>/dev/null
-```
-
-파일이 있으면 새로 만들 필요 없이 기존 공개키를 사용하면 됩니다.
 
 ### OCI에 등록
 
@@ -116,13 +107,9 @@ ssh ubuntu@<VM_PUBLIC_IP>
 git clone https://github.com/geniuskey/arbot.git ~/arbot
 cd ~/arbot
 
-# 초기 설정 (Docker, 방화벽, swap)
+# 시스템 패키지 설치 (Python, PostgreSQL, Redis, Prometheus, Grafana)
 chmod +x deploy/oracle-cloud/setup.sh
 ./deploy/oracle-cloud/setup.sh
-
-# Docker 그룹 적용을 위해 재접속
-exit
-ssh ubuntu@<VM_PUBLIC_IP>
 ```
 
 ## Step 3: 환경 변수 설정
@@ -136,10 +123,8 @@ nano .env
 최소 필수 설정:
 
 ```env
-HOST_IP=<VM_PUBLIC_IP>
 POSTGRES_PASSWORD=<strong_password>
 REDIS_PASSWORD=<strong_password>
-GRAFANA_PASSWORD=<strong_password>
 ```
 
 ::: tip 비밀번호 생성
@@ -148,35 +133,31 @@ openssl rand -base64 24
 ```
 :::
 
-## Step 4: 서비스 시작
+## Step 4: ArBot 설치
 
 ```bash
 cd ~/arbot
-docker compose -f deploy/oracle-cloud/docker-compose.yml up -d
+chmod +x deploy/oracle-cloud/install.sh
+./deploy/oracle-cloud/install.sh
 ```
 
-상태 확인:
+이 스크립트가 자동으로:
+- PostgreSQL DB/유저 생성
+- Redis 비밀번호 설정
+- Python venv 생성 + 패키지 설치
+- systemd 서비스 등록
+
+## Step 5: 시작 및 확인
 
 ```bash
-docker compose -f deploy/oracle-cloud/docker-compose.yml ps
-```
+# 시작
+sudo systemctl start arbot
 
-```
-NAME        STATUS              PORTS
-postgres    Up (healthy)        127.0.0.1:5432->5432/tcp
-redis       Up (healthy)        127.0.0.1:6379->6379/tcp
-prometheus  Up                  127.0.0.1:9090->9090/tcp
-grafana     Up                  0.0.0.0:3000->3000/tcp
-arbot       Up                  0.0.0.0:8080->8080/tcp
-watchtower  Up
-```
+# 로그 확인
+journalctl -u arbot -f
 
-## Step 5: 확인
-
-### 로그 확인
-
-```bash
-docker compose -f deploy/oracle-cloud/docker-compose.yml logs -f arbot
+# 상태 확인
+sudo systemctl status arbot
 ```
 
 ### Grafana 접속
@@ -184,73 +165,55 @@ docker compose -f deploy/oracle-cloud/docker-compose.yml logs -f arbot
 브라우저에서 `http://<VM_PUBLIC_IP>:3000` 접속
 
 - ID: `admin`
-- PW: `.env`에서 설정한 `GRAFANA_PASSWORD`
-
-## 메모리 배분
-
-24GB RAM을 다음과 같이 배분합니다.
-
-| 서비스 | 메모리 제한 | 비고 |
-|--------|-----------|------|
-| ArBot | 4 GB | 메인 봇 |
-| PostgreSQL | 2 GB | 거래 기록 |
-| Redis | 1 GB | 캐시, LRU 정책 |
-| Prometheus | 512 MB | 30일 보관 |
-| Grafana | 512 MB | 대시보드 |
-| Watchtower | 128 MB | 자동 업데이트 |
-| OS + 여유 | ~16 GB | 충분한 버퍼 |
+- PW: 초기 비밀번호 `admin` (첫 로그인 시 변경)
 
 ## 운영 명령어
 
 ```bash
-# 전체 시작
-docker compose -f deploy/oracle-cloud/docker-compose.yml up -d
+# 시작 / 중지 / 재시작
+sudo systemctl start arbot
+sudo systemctl stop arbot
+sudo systemctl restart arbot
 
-# 전체 중지
-docker compose -f deploy/oracle-cloud/docker-compose.yml down
+# 실시간 로그
+journalctl -u arbot -f
 
-# ArBot만 재시작
-docker compose -f deploy/oracle-cloud/docker-compose.yml restart arbot
+# 최근 100줄
+journalctl -u arbot -n 100
 
-# 로그 확인 (최근 100줄)
-docker compose -f deploy/oracle-cloud/docker-compose.yml logs --tail 100 arbot
-
-# 리소스 사용량
-docker stats --no-stream
-
-# 디스크 정리
-docker system prune -f
-```
-
-## 자동 재시작
-
-`docker-compose.yml`에 `restart: unless-stopped`가 설정되어 있어 VM 재부팅 시 자동 시작됩니다. Docker 서비스 자동 시작 확인:
-
-```bash
-sudo systemctl enable docker
+# 서비스 상태
+systemctl status arbot postgresql redis-server prometheus grafana-server
 ```
 
 ## 업데이트
 
-Watchtower가 매일 04:00에 Docker 이미지를 자동 업데이트합니다. 소스 코드 업데이트는 수동으로 진행합니다.
-
 ```bash
 cd ~/arbot
 git pull
-docker compose -f deploy/oracle-cloud/docker-compose.yml up -d --build arbot
+.venv/bin/pip install .
+sudo systemctl restart arbot
 ```
 
-## Phase 3 전환 시
+3줄로 끝. Docker rebuild 대비 수초 만에 완료.
 
-실전 트레이딩으로 전환할 때는 다음을 고려하세요.
+## 자동 재시작
 
-- **레이턴시**: Oracle Cloud 리전과 거래소 서버 간 ping 측정
-- **ClickHouse 추가**: 틱 데이터 양이 많아지면 별도 추가
-- **백업**: PostgreSQL 일일 백업 크론잡 설정
-- **모니터링 강화**: Grafana 알림 규칙 설정
+systemd `Restart=always` 설정으로 크래시 시 5초 후 자동 재시작. VM 재부팅 시에도 자동 시작.
 
 ```bash
-# 거래소 레이턴시 측정
-ping -c 10 api.binance.com
-ping -c 10 www.okx.com
+# 부팅 시 자동 시작 확인
+sudo systemctl is-enabled arbot
 ```
+
+## 메모리 배분
+
+24GB RAM 사용 (Docker 오버헤드 없음):
+
+| 서비스 | 예상 사용량 | 비고 |
+|--------|-----------|------|
+| ArBot | 1-2 GB | 메인 봇 |
+| PostgreSQL | 1-2 GB | 거래 기록 |
+| Redis | 0.5 GB | 캐시 |
+| Prometheus | 0.3 GB | 메트릭 |
+| Grafana | 0.3 GB | 대시보드 |
+| OS + 여유 | ~19 GB | 충분한 버퍼 |
