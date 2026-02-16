@@ -7,10 +7,10 @@ set -euo pipefail
 # =============================================================================
 
 ARBOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-ENV_FILE="$ARBOT_DIR/deploy/oracle-cloud/.env"
+ENV_FILE="$ARBOT_DIR/.env"
 
 if [ ! -f "$ENV_FILE" ]; then
-    echo "ERROR: $ENV_FILE not found. Copy .env.example first."
+    echo "ERROR: $ENV_FILE not found. Run: cp .env.example .env"
     exit 1
 fi
 
@@ -26,24 +26,16 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='arbot'" | grep 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='arbot'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE DATABASE arbot OWNER arbot;"
 
-# --- 2. Redis password ---
-echo "[2/4] Configuring Redis..."
-if [ -n "${REDIS_PASSWORD:-}" ]; then
-    sudo sed -i "s/^# requirepass .*/requirepass ${REDIS_PASSWORD}/" /etc/redis/redis.conf
-    sudo sed -i "s/^requirepass .*/requirepass ${REDIS_PASSWORD}/" /etc/redis/redis.conf
-    sudo systemctl restart redis-server
-fi
-
-# --- 3. Python venv + install ---
-echo "[3/4] Setting up Python environment..."
+# --- 2. Python venv + install ---
+echo "[2/3] Setting up Python environment..."
 cd "$ARBOT_DIR"
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install .
 
-# --- 4. Systemd service ---
-echo "[4/4] Installing systemd service..."
+# --- 3. Systemd service ---
+echo "[3/3] Installing systemd service..."
 sudo tee /etc/systemd/system/arbot.service > /dev/null <<UNIT
 [Unit]
 Description=ArBot Crypto Arbitrage System
