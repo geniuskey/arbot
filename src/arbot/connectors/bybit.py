@@ -169,14 +169,24 @@ class BybitConnector(BaseConnector):
 
         Args:
             symbols: Trading pairs (e.g. ["BTC/USDT", "ETH/USDT"]).
-            depth: Number of price levels (1, 25, 50, 200; 10 maps to Bybit's closest).
+            depth: Number of price levels. Bybit v5 spot supports 1, 50, 200.
+                   Other values are mapped to the nearest valid depth.
         """
+        # Bybit v5 spot only supports depths: 1, 50, 200
+        # Use 50 as minimum useful depth for arbitrage detection
+        if depth <= 1:
+            bybit_depth = 1
+        elif depth <= 50:
+            bybit_depth = 50
+        else:
+            bybit_depth = 200
+
         for symbol in symbols:
-            self._orderbook_symbols[symbol] = depth
+            self._orderbook_symbols[symbol] = bybit_depth
 
         await self._ensure_ws_connected()
 
-        args = [f"orderbook.{depth}.{_to_bybit_symbol(s)}" for s in symbols]
+        args = [f"orderbook.{bybit_depth}.{_to_bybit_symbol(s)}" for s in symbols]
         await self._bybit_subscribe(args)
         self._logger.info(
             "bybit_orderbook_subscribed",
