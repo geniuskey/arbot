@@ -1,8 +1,8 @@
 exchanges:
   binance:
     tier: 1
-    maker_fee_pct: 0.10
-    taker_fee_pct: 0.10
+    maker_fee_pct: 0.075
+    taker_fee_pct: 0.075
     rate_limit:
       type: weight
       limit: 1200
@@ -14,8 +14,8 @@ exchanges:
 
   okx:
     tier: 1
-    maker_fee_pct: 0.08
-    taker_fee_pct: 0.10
+    maker_fee_pct: 0.060
+    taker_fee_pct: 0.080
     rate_limit:
       type: per_endpoint
       default_limit: 20
@@ -27,8 +27,8 @@ exchanges:
 
   bybit:
     tier: 1
-    maker_fee_pct: 0.10
-    taker_fee_pct: 0.10
+    maker_fee_pct: 0.040
+    taker_fee_pct: 0.060
     rate_limit:
       type: count
       limit: 600
@@ -53,8 +53,8 @@ exchanges:
 
   kucoin:
     tier: 2
-    maker_fee_pct: 0.10
-    taker_fee_pct: 0.10
+    maker_fee_pct: 0.070
+    taker_fee_pct: 0.070
     rate_limit:
       type: count
       limit: 30

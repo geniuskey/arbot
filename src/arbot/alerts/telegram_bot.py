@@ -221,7 +221,7 @@ class TelegramBotService:
         # Redis orderbook check
         if self._redis_cache is not None:
             lines.append("\n-- Redis Orderbooks --")
-            for symbol in self._config.symbols[:3]:
+            for symbol in self._config.symbols:
                 try:
                     obs = await self._redis_cache.get_all_orderbooks(symbol)
                     if not obs:
@@ -264,6 +264,17 @@ class TelegramBotService:
         lines.append(f"  spread_mode: {spread_mode}")
         lines.append(f"  min_spread_pct: {self._config.detector.spatial.min_spread_pct}%")
         lines.append(f"  min_depth_usd: ${self._config.detector.spatial.min_depth_usd}")
+        lines.append(f"  min_net_spread_pct: {self._config.risk.min_net_spread_pct}%")
+
+        # Exchange fees
+        lines.append("\n-- Fees (VIP) --")
+        for ex_name in self._config.exchanges_enabled:
+            from arbot.config import ExchangeConfig
+            ex_cfg = self._config.exchange_configs.get(ex_name, ExchangeConfig())
+            lines.append(
+                f"  {ex_name}: maker={ex_cfg.maker_fee_pct:.3f}% "
+                f"taker={ex_cfg.taker_fee_pct:.3f}%"
+            )
 
         assert update.message is not None
         text = "\n".join(lines)
