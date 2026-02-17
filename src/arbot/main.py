@@ -162,7 +162,14 @@ def _build_initial_balances(config: AppConfig) -> dict[str, dict[str, float]]:
     """
     balances: dict[str, dict[str, float]] = {}
     for name in config.exchanges_enabled:
-        balances[name] = {"USDT": 1_000.0, "BTC": 0.01, "ETH": 0.2}
+        balances[name] = {
+            "USDT": 1_000.0,
+            "BTC": 0.01,
+            "ETH": 0.2,
+            "SOL": 5.0,
+            "XRP": 500.0,
+            "DOGE": 3_000.0,
+        }
     return balances
 
 

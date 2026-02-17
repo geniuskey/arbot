@@ -182,14 +182,11 @@ class BybitConnector(BaseConnector):
             depth: Number of price levels. Bybit v5 spot supports 1, 50, 200.
                    Other values are mapped to the nearest valid depth.
         """
-        # Bybit v5 spot only supports depths: 1, 50, 200
-        # Use 50 as minimum useful depth for arbitrage detection
-        if depth <= 1:
-            bybit_depth = 1
-        elif depth <= 50:
-            bybit_depth = 50
-        else:
-            bybit_depth = 200
+        # Bybit v5 spot: orderbook.1 always sends full snapshots.
+        # orderbook.50/200 send snapshot once then deltas, which
+        # would require local state management.  Use depth 1 for
+        # reliable best-bid/ask data (sufficient for arb detection).
+        bybit_depth = 1
 
         for symbol in symbols:
             self._orderbook_symbols[symbol] = bybit_depth
