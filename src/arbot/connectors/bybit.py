@@ -4,6 +4,7 @@ Provides WebSocket streaming for order book and trade data, and REST API
 access via ccxt for order management, balance queries, and fee lookups.
 """
 
+import asyncio
 import time
 from datetime import UTC, datetime
 
@@ -125,6 +126,7 @@ class BybitConnector(BaseConnector):
         self._orderbook_symbols: dict[str, int] = {}  # symbol -> depth
         self._trade_symbols: set[str] = set()
         self._subscribed_args: list[str] = []
+        self._ping_task: asyncio.Task | None = None
 
     async def connect(self) -> None:
         """Establish Bybit REST API and WebSocket connections."""
@@ -152,6 +154,14 @@ class BybitConnector(BaseConnector):
 
     async def disconnect(self) -> None:
         """Disconnect from Bybit WebSocket and REST API."""
+        if self._ping_task is not None:
+            self._ping_task.cancel()
+            try:
+                await self._ping_task
+            except asyncio.CancelledError:
+                pass
+            self._ping_task = None
+
         if self._ws_manager is not None:
             await self._ws_manager.disconnect()
             self._ws_manager = None
@@ -479,14 +489,36 @@ class BybitConnector(BaseConnector):
             on_message=self._handle_ws_message,
             reconnect_delay=1.0,
             max_reconnect_delay=60.0,
-            heartbeat_interval=20.0,
+            heartbeat_interval=0,  # Disable standard WS ping; use Bybit JSON ping
         )
         await self._ws_manager.connect()
         self._logger.info("bybit_ws_connected")
 
+        # Start Bybit-specific JSON ping loop
+        if self._ping_task is not None:
+            self._ping_task.cancel()
+        self._ping_task = asyncio.create_task(self._bybit_ping_loop())
+
         # Re-subscribe previously tracked channels after reconnection
         if self._subscribed_args:
             await self._bybit_subscribe(list(self._subscribed_args))
+
+    async def _bybit_ping_loop(self) -> None:
+        """Send Bybit-specific JSON ping every 5 seconds.
+
+        Bybit v5 requires {"op": "ping"} messages (not WebSocket protocol pings)
+        and closes connections after ~10 seconds without one.
+        """
+        try:
+            while self._ws_manager is not None and self._ws_manager.is_connected:
+                await asyncio.sleep(5)
+                try:
+                    await self._ws_manager.send({"op": "ping"})
+                except (ConnectionError, Exception):
+                    self._logger.warning("bybit_ping_failed")
+                    break
+        except asyncio.CancelledError:
+            pass
 
     async def _bybit_subscribe(self, args: list[str]) -> None:
         """Send a Bybit-format subscribe message.
