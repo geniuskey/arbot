@@ -196,12 +196,14 @@ class BybitConnector(BaseConnector):
 
         await self._ensure_ws_connected()
 
-        args = [f"orderbook.{bybit_depth}.{_to_bybit_symbol(s)}" for s in symbols]
-        await self._bybit_subscribe(args)
+        # Subscribe per-symbol to avoid one invalid symbol failing the batch
+        for symbol in symbols:
+            arg = f"orderbook.{bybit_depth}.{_to_bybit_symbol(symbol)}"
+            await self._bybit_subscribe([arg])
         self._logger.info(
             "bybit_orderbook_subscribed",
             symbols=symbols,
-            depth=depth,
+            depth=bybit_depth,
         )
 
     async def subscribe_trades(self, symbols: list[str]) -> None:
@@ -214,8 +216,9 @@ class BybitConnector(BaseConnector):
 
         await self._ensure_ws_connected()
 
-        args = [f"publicTrade.{_to_bybit_symbol(s)}" for s in symbols]
-        await self._bybit_subscribe(args)
+        for symbol in symbols:
+            arg = f"publicTrade.{_to_bybit_symbol(symbol)}"
+            await self._bybit_subscribe([arg])
         self._logger.info("bybit_trades_subscribed", symbols=symbols)
 
     async def place_order(
