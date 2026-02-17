@@ -139,6 +139,10 @@ class PaperExecutor(BaseExecutor):
         self._adjust_balance(sell_ex, quote_asset, received_quote)
 
         self.trade_history.append((buy_result, sell_result))
+
+        # Auto-rebalance across exchanges after each trade
+        self._rebalance()
+
         return buy_result, sell_result
 
     def execute_triangular(
@@ -276,6 +280,28 @@ class PaperExecutor(BaseExecutor):
                 pnl[exchange] = exchange_pnl
 
         return pnl
+
+    def _rebalance(self) -> None:
+        """Redistribute all assets evenly across exchanges.
+
+        Simulates instant cross-exchange transfers so that each exchange
+        holds an equal share of every asset. This prevents one-sided
+        balance depletion in paper trading mode.
+        """
+        num_exchanges = len(self.balances)
+        if num_exchanges < 2:
+            return
+
+        # Sum totals per asset across all exchanges
+        totals: dict[str, float] = {}
+        for assets in self.balances.values():
+            for asset, amount in assets.items():
+                totals[asset] = totals.get(asset, 0.0) + amount
+
+        # Distribute evenly
+        for exchange in self.balances:
+            for asset, total in totals.items():
+                self.balances[exchange][asset] = total / num_exchanges
 
     def _get_balance(self, exchange: str, asset: str) -> float:
         """Get current balance for an asset on an exchange."""
