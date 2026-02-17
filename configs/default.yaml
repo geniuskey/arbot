@@ -8,11 +8,12 @@ exchanges:
     - binance
     - okx
     - bybit
-    - upbit
     - kucoin
+    - upbit
 
 symbols:
   - BTC/USDT
+  - ETH/USDT
 
 detector:
   spatial:
@@ -47,6 +48,7 @@ risk:
   max_spread_pct: 5.0
   consecutive_loss_limit: 10
   cooldown_minutes: 30
+  min_net_spread_pct: 0.0
   flash_crash_pct: 10.0
   spread_std_threshold: 3.0
   stale_threshold_seconds: 30.0

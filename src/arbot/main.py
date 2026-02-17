@@ -19,6 +19,7 @@ from arbot.config import AppConfig, ExecutionMode, ExchangeConfig, load_config
 from arbot.connectors.base import BaseConnector
 from arbot.connectors.binance import BinanceConnector
 from arbot.connectors.bybit import BybitConnector
+from arbot.connectors.kucoin import KuCoinConnector
 from arbot.connectors.okx import OKXConnector
 from arbot.connectors.upbit import UpbitConnector
 from arbot.core.collector import PriceCollector
@@ -48,6 +49,7 @@ except ImportError:
 _CONNECTOR_CLASSES: dict[str, type[BaseConnector]] = {
     "binance": BinanceConnector,
     "bybit": BybitConnector,
+    "kucoin": KuCoinConnector,
     "okx": OKXConnector,
     "upbit": UpbitConnector,
 }
@@ -160,7 +162,7 @@ def _build_initial_balances(config: AppConfig) -> dict[str, dict[str, float]]:
     """
     balances: dict[str, dict[str, float]] = {}
     for name in config.exchanges_enabled:
-        balances[name] = {"USDT": 1_000.0, "BTC": 0.01}
+        balances[name] = {"USDT": 1_000.0, "BTC": 0.01, "ETH": 0.2}
     return balances
 
 

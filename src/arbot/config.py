@@ -79,6 +79,7 @@ class RiskConfig(BaseModel):
     max_spread_pct: float = 5.0
     consecutive_loss_limit: int = 10
     cooldown_minutes: int = 30
+    min_net_spread_pct: float = 0.0
 
 
 class RebalancerConfig(BaseModel):

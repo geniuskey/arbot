@@ -133,7 +133,11 @@ class RiskManager:
         if abs(signal.net_spread_pct) > self.config.price_deviation_threshold_pct:
             return False, f"net spread {signal.net_spread_pct:.4f}% exceeds deviation threshold {self.config.price_deviation_threshold_pct:.4f}%"
 
-        # 8. Total exposure check
+        # 8. Minimum net spread (fee-aware filter)
+        if signal.net_spread_pct < self.config.min_net_spread_pct:
+            return False, f"net spread {signal.net_spread_pct:.4f}% below min {self.config.min_net_spread_pct:.4f}%"
+
+        # 9. Total exposure check
         total_exposure = portfolio.total_usd_value
         if total_exposure + trade_usd > self.config.max_total_exposure_usd:
             return False, f"total exposure {total_exposure + trade_usd:.2f} USD exceeds limit {self.config.max_total_exposure_usd:.2f}"

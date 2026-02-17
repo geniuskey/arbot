@@ -73,3 +73,4 @@ class RiskConfig(BaseModel):
     spread_std_threshold: float = 3.0
     stale_threshold_seconds: float = 30.0
     warning_threshold_pct: float = 70.0
+    min_net_spread_pct: float = 0.0
