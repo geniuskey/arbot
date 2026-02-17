@@ -119,8 +119,10 @@ class TestBuildInitialBalances:
         balances = _build_initial_balances(config)
         assert "binance" in balances
         assert "upbit" in balances
-        assert balances["binance"]["USDT"] == 10_000.0
-        assert balances["upbit"]["USDT"] == 10_000.0
+        assert balances["binance"]["USDT"] == 1_000.0
+        assert balances["binance"]["BTC"] == 0.01
+        assert balances["upbit"]["USDT"] == 1_000.0
+        assert balances["upbit"]["BTC"] == 0.01
 
     def test_empty_exchanges(self) -> None:
         config = AppConfig(exchanges_enabled=[])
