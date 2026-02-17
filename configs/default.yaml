@@ -42,9 +42,9 @@ detector:
 
   funding:
     enabled: true
-    min_rate_threshold: 0.0001
-    min_annualized_pct: 10.0
-    close_threshold_pct: 5.0
+    min_rate_threshold: 0.00005
+    min_annualized_pct: 5.0
+    close_threshold_pct: 2.0
     max_positions: 3
     position_size_usd: 500.0
     check_interval_seconds: 300

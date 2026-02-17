@@ -3,12 +3,17 @@
 Fetches real funding rates from exchanges via ccxt REST and identifies
 opportunities where the funding rate exceeds a threshold for delta-neutral
 carry trade (spot long + perp short).
+
+Creates dedicated futures/swap ccxt instances for exchanges where the
+spot instance cannot access funding rate data (e.g. Binance, KuCoin).
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+
+import ccxt.async_support as ccxt
 
 from arbot.logging import get_logger
 from arbot.models.funding import FundingRateSnapshot
@@ -18,13 +23,29 @@ if TYPE_CHECKING:
 
 logger = get_logger("detector.funding")
 
+# Exchanges that need a separate futures/swap ccxt instance.
+# OKX and Bybit have unified APIs (spot instance works for futures).
+_FUTURES_EXCHANGE_FACTORIES: dict[str, type] = {
+    "binance": ccxt.binance,
+    "kucoin": ccxt.kucoinfutures,
+}
+
+_FUTURES_OPTIONS: dict[str, dict[str, Any]] = {
+    "binance": {"options": {"defaultType": "swap"}},
+    "kucoin": {},
+}
+
 
 class FundingRateDetector:
     """Fetches and evaluates funding rates across exchanges.
 
+    For exchanges with unified APIs (OKX, Bybit), uses the connector's
+    existing ccxt instance. For others (Binance, KuCoin), creates
+    dedicated futures ccxt instances (no API keys needed for public data).
+
     Args:
-        min_rate_threshold: Minimum funding rate per 8h to consider (e.g. 0.0001 = 0.01%).
-        min_annualized_pct: Minimum annualized rate in percent (e.g. 10.0).
+        min_rate_threshold: Minimum funding rate per 8h to consider.
+        min_annualized_pct: Minimum annualized rate in percent.
         symbols: Perpetual futures symbols to monitor (ccxt format).
     """
 
@@ -37,6 +58,37 @@ class FundingRateDetector:
         self.min_rate_threshold = min_rate_threshold
         self.min_annualized_pct = min_annualized_pct
         self.symbols = symbols or ["BTC/USDT:USDT", "ETH/USDT:USDT"]
+        self._futures_instances: dict[str, Any] = {}
+
+    async def _get_futures_exchange(self, exchange_name: str) -> Any | None:
+        """Get or create a futures ccxt instance for an exchange.
+
+        Returns None if the exchange doesn't need a separate instance
+        (unified API exchanges like OKX, Bybit are handled via connector).
+        """
+        if exchange_name not in _FUTURES_EXCHANGE_FACTORIES:
+            return None
+
+        if exchange_name not in self._futures_instances:
+            factory = _FUTURES_EXCHANGE_FACTORIES[exchange_name]
+            options = _FUTURES_OPTIONS.get(exchange_name, {})
+            instance = factory(options)
+            self._futures_instances[exchange_name] = instance
+            logger.info(
+                "futures_ccxt_created",
+                exchange=exchange_name,
+            )
+
+        return self._futures_instances[exchange_name]
+
+    async def close(self) -> None:
+        """Close all futures ccxt instances."""
+        for name, instance in self._futures_instances.items():
+            try:
+                await instance.close()
+            except Exception:
+                logger.debug("futures_ccxt_close_error", exchange=name)
+        self._futures_instances.clear()
 
     async def fetch_rates(
         self,
@@ -44,8 +96,8 @@ class FundingRateDetector:
     ) -> list[FundingRateSnapshot]:
         """Fetch current funding rates from all connectors via ccxt REST.
 
-        Uses ccxt's fetch_funding_rate() for each symbol on each exchange.
-        Failures are logged and skipped.
+        For each exchange, tries a dedicated futures instance first.
+        Falls back to the connector's spot instance (works for unified APIs).
 
         Args:
             connectors: List of connected exchange connectors.
@@ -56,32 +108,54 @@ class FundingRateDetector:
         snapshots: list[FundingRateSnapshot] = []
 
         for connector in connectors:
-            exchange: Any = getattr(connector, "_exchange", None)
-            if exchange is None:
+            exchange_name = connector.exchange_name
+
+            # Try dedicated futures instance first, fall back to spot
+            futures_ex = await self._get_futures_exchange(exchange_name)
+            spot_ex: Any = getattr(connector, "_exchange", None)
+
+            # Prefer futures instance, then spot (for unified APIs)
+            exchanges_to_try = []
+            if futures_ex is not None:
+                exchanges_to_try.append(futures_ex)
+            if spot_ex is not None:
+                exchanges_to_try.append(spot_ex)
+
+            if not exchanges_to_try:
                 continue
 
             for symbol in self.symbols:
-                try:
-                    data = await exchange.fetch_funding_rate(symbol)
-                    funding_ts = data.get("fundingTimestamp") or data.get("timestamp") or 0
-                    snapshot = FundingRateSnapshot(
-                        exchange=connector.exchange_name,
-                        symbol=symbol,
-                        funding_rate=float(data.get("fundingRate", 0) or 0),
-                        next_funding_time=datetime.fromtimestamp(
-                            funding_ts / 1000 if funding_ts > 1e10 else funding_ts,
-                            tz=UTC,
-                        ),
-                        mark_price=float(data.get("markPrice", 0) or 0),
-                        index_price=float(data.get("indexPrice", 0) or 0),
-                    )
-                    snapshots.append(snapshot)
-                except Exception as e:
+                fetched = False
+                for ex in exchanges_to_try:
+                    try:
+                        data = await ex.fetch_funding_rate(symbol)
+                        funding_ts = (
+                            data.get("fundingTimestamp")
+                            or data.get("timestamp")
+                            or 0
+                        )
+                        snapshot = FundingRateSnapshot(
+                            exchange=exchange_name,
+                            symbol=symbol,
+                            funding_rate=float(data.get("fundingRate", 0) or 0),
+                            next_funding_time=datetime.fromtimestamp(
+                                funding_ts / 1000 if funding_ts > 1e10 else funding_ts,
+                                tz=UTC,
+                            ),
+                            mark_price=float(data.get("markPrice", 0) or 0),
+                            index_price=float(data.get("indexPrice", 0) or 0),
+                        )
+                        snapshots.append(snapshot)
+                        fetched = True
+                        break
+                    except Exception:
+                        continue
+
+                if not fetched:
                     logger.debug(
                         "funding_rate_fetch_failed",
-                        exchange=connector.exchange_name,
+                        exchange=exchange_name,
                         symbol=symbol,
-                        error=str(e),
                     )
 
         return snapshots

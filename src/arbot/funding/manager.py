@@ -99,7 +99,7 @@ class FundingRateManager:
         logger.info("funding_manager_started")
 
     async def stop(self) -> None:
-        """Stop the funding rate management loop."""
+        """Stop the funding rate management loop and clean up."""
         self._running = False
         if self._task is not None:
             self._task.cancel()
@@ -108,6 +108,7 @@ class FundingRateManager:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        await self._detector.close()
         logger.info("funding_manager_stopped")
 
     async def _run_loop(self) -> None:
