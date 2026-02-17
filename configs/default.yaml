@@ -13,10 +13,6 @@ exchanges:
 
 symbols:
   - BTC/USDT
-  - ETH/USDT
-  - SOL/USDT
-  - XRP/USDT
-  - DOGE/USDT
 
 detector:
   spatial:
@@ -27,7 +23,7 @@ detector:
     use_gross_spread: true
 
   triangular:
-    enabled: true
+    enabled: false
     min_profit_pct: 0.15
     paths:
       - [BTC/USDT, ETH/BTC, ETH/USDT]
