@@ -211,14 +211,15 @@ class FundingRateManager:
             if already_open:
                 continue
 
-            if snapshot.index_price <= 0:
+            price = snapshot.index_price or snapshot.mark_price
+            if price <= 0:
                 continue
 
             spot_symbol = snapshot.symbol.split(":")[0]
             base_asset = spot_symbol.split("/")[0]
             quote_asset = spot_symbol.split("/")[1]
 
-            quantity = self._position_size_usd / snapshot.index_price
+            quantity = self._position_size_usd / price
             quote_needed = self._position_size_usd
 
             balance = self._executor._get_balance(snapshot.exchange, quote_asset)

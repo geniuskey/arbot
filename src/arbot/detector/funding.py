@@ -187,7 +187,6 @@ class FundingRateDetector:
             for s in snapshots
             if s.funding_rate >= self.min_rate_threshold
             and s.annualized_rate >= self.min_annualized_pct
-            and s.mark_price > 0
         ]
         opportunities.sort(key=lambda s: s.funding_rate, reverse=True)
         return opportunities

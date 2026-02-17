@@ -351,10 +351,14 @@ class TelegramBotService:
         if latest:
             lines.append(f"\n-- Latest Rates ({len(latest)}) --")
             for key, snap in sorted(latest.items()):
+                price_str = ""
+                if snap.index_price > 0:
+                    price_str = f" idx=${snap.index_price:,.0f}"
                 lines.append(
                     f"  {snap.exchange} {snap.symbol.split(':')[0]}: "
                     f"{snap.funding_rate:.6f} "
                     f"({snap.annualized_rate:.1f}%/yr)"
+                    f"{price_str}"
                 )
 
         text = "\n".join(lines)
