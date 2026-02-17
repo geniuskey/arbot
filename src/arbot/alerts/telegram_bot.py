@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from arbot.core.collector import PriceCollector
     from arbot.core.simulator import PaperTradingSimulator
     from arbot.execution.paper_executor import PaperExecutor
+    from arbot.funding.manager import FundingRateManager
     from arbot.storage.redis_cache import RedisCache
 
 logger = get_logger("telegram_bot")
@@ -49,6 +50,7 @@ class TelegramBotService:
         config: AppConfig,
         redis_cache: RedisCache | None = None,
         collector: PriceCollector | None = None,
+        funding_manager: FundingRateManager | None = None,
     ) -> None:
         self._chat_id = str(chat_id)
         self._simulator = simulator
@@ -57,6 +59,7 @@ class TelegramBotService:
         self._config = config
         self._redis_cache = redis_cache
         self._collector = collector
+        self._funding_manager = funding_manager
         self._started_at = datetime.now(UTC)
 
         self._app = (
@@ -69,6 +72,7 @@ class TelegramBotService:
         self._app.add_handler(CommandHandler("balance", self._cmd_balance))
         self._app.add_handler(CommandHandler("trades", self._cmd_trades))
         self._app.add_handler(CommandHandler("debug", self._cmd_debug))
+        self._app.add_handler(CommandHandler("funding", self._cmd_funding))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
         self._app.add_handler(CommandHandler("start", self._cmd_help))
 
@@ -149,6 +153,19 @@ class TelegramBotService:
             f"Trades: {report.trade_count}\n"
             f"Win rate: {report.win_rate:.1%}"
         )
+
+        if self._funding_manager is not None:
+            fs = self._funding_manager.get_stats()
+            open_count = len(self._funding_manager.open_positions)
+            msg += (
+                f"\n\n[Funding Rate]\n"
+                f"Open: {open_count} / Closed: {fs.total_positions_closed}\n"
+                f"Collected: ${fs.total_funding_collected:,.4f}\n"
+                f"Fees: ${fs.total_fees_paid:,.4f}\n"
+                f"Net PnL: ${fs.total_net_pnl:,.4f}\n"
+                f"Rate checks: {fs.rate_checks}"
+            )
+
         assert update.message is not None
         await update.message.reply_text(msg)
 
@@ -276,7 +293,70 @@ class TelegramBotService:
                 f"taker={ex_cfg.taker_fee_pct:.3f}%"
             )
 
+        # Funding rates
+        if self._funding_manager is not None and self._funding_manager.latest_rates:
+            lines.append("\n-- Funding Rates --")
+            for key, snap in sorted(self._funding_manager.latest_rates.items()):
+                lines.append(
+                    f"  {snap.exchange} {snap.symbol}: "
+                    f"{snap.funding_rate:.6f} "
+                    f"({snap.annualized_rate:.1f}%/yr)"
+                )
+
         assert update.message is not None
+        text = "\n".join(lines)
+        if len(text) > 4096:
+            text = text[:4093] + "..."
+        await update.message.reply_text(text)
+
+    async def _cmd_funding(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        if not self._is_authorized(update):
+            return
+
+        assert update.message is not None
+
+        if self._funding_manager is None:
+            await update.message.reply_text("Funding rate arb is disabled.")
+            return
+
+        stats = self._funding_manager.get_stats()
+        open_positions = self._funding_manager.open_positions
+        latest = self._funding_manager.latest_rates
+
+        lines = ["[Funding Rate Arbitrage]"]
+        lines.append(
+            f"Status: {'Running' if self._funding_manager.is_running else 'Stopped'}"
+        )
+        lines.append(f"Rate checks: {stats.rate_checks}")
+        lines.append(f"Settlements: {stats.funding_settlements}")
+        lines.append(f"Positions opened: {stats.total_positions_opened}")
+        lines.append(f"Positions closed: {stats.total_positions_closed}")
+        lines.append(f"Funding collected: ${stats.total_funding_collected:,.4f}")
+        lines.append(f"Fees paid: ${stats.total_fees_paid:,.4f}")
+        lines.append(f"Net PnL: ${stats.total_net_pnl:,.4f}")
+
+        if open_positions:
+            lines.append(f"\n-- Open Positions ({len(open_positions)}) --")
+            for pos in open_positions:
+                lines.append(
+                    f"  {pos.exchange} {pos.symbol}\n"
+                    f"    qty={pos.quantity:.6f} "
+                    f"funding=${pos.total_funding_collected:,.4f}\n"
+                    f"    payments={pos.funding_payments} "
+                    f"hours={pos.holding_hours:.1f}"
+                )
+
+        if latest:
+            lines.append(f"\n-- Latest Rates ({len(latest)}) --")
+            for key, snap in sorted(latest.items()):
+                lines.append(
+                    f"  {snap.exchange} {snap.symbol.split(':')[0]}: "
+                    f"{snap.funding_rate:.6f} "
+                    f"({snap.annualized_rate:.1f}%/yr)"
+                )
+
         text = "\n".join(lines)
         if len(text) > 4096:
             text = text[:4093] + "..."
@@ -294,6 +374,7 @@ class TelegramBotService:
             "/stats   - Pipeline statistics\n"
             "/balance - Portfolio balance\n"
             "/trades  - Recent trades (last 5)\n"
+            "/funding - Funding rate arb status\n"
             "/debug   - Orderbook & collector debug\n"
             "/help    - This message"
         )

@@ -58,12 +58,32 @@ class StatisticalDetectorConfig(BaseModel):
     p_value_threshold: float = 0.05
 
 
+class FundingDetectorConfig(BaseModel):
+    """Funding rate arbitrage detector settings."""
+
+    enabled: bool = False
+    min_rate_threshold: float = 0.0001
+    min_annualized_pct: float = 10.0
+    close_threshold_pct: float = 5.0
+    max_positions: int = 3
+    position_size_usd: float = 500.0
+    check_interval_seconds: float = 300.0
+    perp_symbols: list[str] = Field(
+        default_factory=lambda: [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT",
+            "SOL/USDT:USDT",
+        ]
+    )
+
+
 class DetectorConfig(BaseModel):
     """Arbitrage opportunity detector settings."""
 
     spatial: SpatialDetectorConfig = Field(default_factory=SpatialDetectorConfig)
     triangular: TriangularDetectorConfig = Field(default_factory=TriangularDetectorConfig)
     statistical: StatisticalDetectorConfig = Field(default_factory=StatisticalDetectorConfig)
+    funding: FundingDetectorConfig = Field(default_factory=FundingDetectorConfig)
 
 
 class RiskConfig(BaseModel):

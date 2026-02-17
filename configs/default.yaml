@@ -40,6 +40,19 @@ detector:
     exit_zscore: 0.5
     p_value_threshold: 0.05
 
+  funding:
+    enabled: true
+    min_rate_threshold: 0.0001
+    min_annualized_pct: 10.0
+    close_threshold_pct: 5.0
+    max_positions: 3
+    position_size_usd: 500.0
+    check_interval_seconds: 300
+    perp_symbols:
+      - BTC/USDT:USDT
+      - ETH/USDT:USDT
+      - SOL/USDT:USDT
+
 risk:
   max_position_per_coin_usd: 10000
   max_position_per_exchange_usd: 50000

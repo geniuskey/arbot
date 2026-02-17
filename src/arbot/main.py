@@ -341,6 +341,29 @@ async def run(
         pipeline=pipeline, interval_seconds=1.0, on_trade=_on_trade,
     )
 
+    # Create funding rate manager (if enabled)
+    funding_manager = None
+    if config.detector.funding.enabled:
+        from arbot.detector.funding import FundingRateDetector
+        from arbot.funding.manager import FundingRateManager
+
+        funding_detector = FundingRateDetector(
+            min_rate_threshold=config.detector.funding.min_rate_threshold,
+            min_annualized_pct=config.detector.funding.min_annualized_pct,
+            symbols=config.detector.funding.perp_symbols,
+        )
+        funding_manager = FundingRateManager(
+            detector=funding_detector,
+            executor=executor,
+            risk_manager=risk_manager,
+            connectors=connectors,
+            max_positions=config.detector.funding.max_positions,
+            position_size_usd=config.detector.funding.position_size_usd,
+            close_threshold=config.detector.funding.close_threshold_pct,
+            check_interval_seconds=config.detector.funding.check_interval_seconds,
+        )
+        logger.info("funding_rate_manager_enabled")
+
     # Telegram interactive bot (if configured)
     telegram_bot_service: TelegramBotService | None = None
     if config.alerts.telegram.enabled and config.alerts.telegram.bot_token:
@@ -355,6 +378,7 @@ async def run(
             config=config,
             redis_cache=redis_cache,
             collector=collector,
+            funding_manager=funding_manager,
         )
 
     # Discord bot (if configured)
@@ -431,6 +455,11 @@ async def run(
                 f"Symbols: {len(config.symbols)}",
             )
 
+        # Start funding rate manager
+        if funding_manager is not None:
+            await funding_manager.start()
+            logger.info("funding_rate_manager_started")
+
         # Start Telegram interactive bot
         if telegram_bot_service is not None:
             await telegram_bot_service.start()
@@ -447,6 +476,19 @@ async def run(
         _signal_handler()
     finally:
         logger.info("arbot_shutting_down")
+
+        # Stop funding rate manager
+        if funding_manager is not None:
+            await funding_manager.stop()
+            fstats = funding_manager.get_stats()
+            logger.info(
+                "funding_rate_report",
+                positions_opened=fstats.total_positions_opened,
+                positions_closed=fstats.total_positions_closed,
+                funding_collected=fstats.total_funding_collected,
+                fees_paid=fstats.total_fees_paid,
+                net_pnl=fstats.total_net_pnl,
+            )
 
         # Stop Telegram interactive bot
         if telegram_bot_service is not None:
