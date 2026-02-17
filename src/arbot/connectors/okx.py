@@ -144,8 +144,10 @@ class OKXConnector(BaseConnector):
 
         await self._ensure_ws_connected()
 
-        # OKX uses books5 (5 levels) or books (full) or bbo-tbt (best bid/offer)
-        channel = "books5" if depth <= 5 else "books"
+        # Always use books5 (5-level full snapshot per push).
+        # The "books" channel sends delta updates that require local state
+        # management; books5 is simpler and sufficient for arbitrage detection.
+        channel = "books5"
         args = [
             {"channel": channel, "instId": _to_okx_inst_id(s)}
             for s in symbols

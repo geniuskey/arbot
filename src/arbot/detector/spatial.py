@@ -102,6 +102,10 @@ class SpatialDetector:
         if not buy_ob.asks or not sell_ob.bids:
             return None
 
+        # Sanity check: skip orderbooks with zero or negative best prices
+        if buy_ob.asks[0].price <= 0 or sell_ob.bids[0].price <= 0:
+            return None
+
         profit: ArbitrageProfit = self._calc.calculate_arbitrage_profit(
             buy_ob, sell_ob, buy_fee, sell_fee, quantity_usd, buy_maker=True
         )
