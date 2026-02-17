@@ -220,6 +220,11 @@ class RateLimiterFactory:
             "limit": 10,
             "window_seconds": 1.0,
         },
+        "kucoin": {
+            "policy": RateLimitPolicy.COUNT,
+            "limit": 100,
+            "window_seconds": 10.0,
+        },
     }
 
     @staticmethod
