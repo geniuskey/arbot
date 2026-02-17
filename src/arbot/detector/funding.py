@@ -134,6 +134,13 @@ class FundingRateDetector:
                             or data.get("timestamp")
                             or 0
                         )
+                        mark = float(data.get("markPrice", 0) or 0)
+                        index = float(data.get("indexPrice", 0) or 0)
+                        # Fallback: use whichever is available
+                        if mark <= 0 and index > 0:
+                            mark = index
+                        elif index <= 0 and mark > 0:
+                            index = mark
                         snapshot = FundingRateSnapshot(
                             exchange=exchange_name,
                             symbol=symbol,
@@ -142,8 +149,8 @@ class FundingRateDetector:
                                 funding_ts / 1000 if funding_ts > 1e10 else funding_ts,
                                 tz=UTC,
                             ),
-                            mark_price=float(data.get("markPrice", 0) or 0),
-                            index_price=float(data.get("indexPrice", 0) or 0),
+                            mark_price=mark,
+                            index_price=index,
                         )
                         snapshots.append(snapshot)
                         fetched = True

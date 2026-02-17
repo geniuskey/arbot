@@ -125,6 +125,15 @@ class FundingRateManager:
                 self._evaluate_closes(snapshots)
 
                 opportunities = self._detector.filter_opportunities(snapshots)
+                if opportunities:
+                    logger.info(
+                        "funding_opportunities_found",
+                        count=len(opportunities),
+                        best_exchange=opportunities[0].exchange,
+                        best_symbol=opportunities[0].symbol,
+                        best_rate=opportunities[0].funding_rate,
+                        best_annualized=round(opportunities[0].annualized_rate, 1),
+                    )
                 self._evaluate_opens(opportunities)
 
                 await asyncio.sleep(self._check_interval)
@@ -202,6 +211,9 @@ class FundingRateManager:
             if already_open:
                 continue
 
+            if snapshot.index_price <= 0:
+                continue
+
             spot_symbol = snapshot.symbol.split(":")[0]
             base_asset = spot_symbol.split("/")[0]
             quote_asset = spot_symbol.split("/")[1]
@@ -211,6 +223,13 @@ class FundingRateManager:
 
             balance = self._executor._get_balance(snapshot.exchange, quote_asset)
             if balance < quote_needed * 2:
+                logger.info(
+                    "funding_open_skip_balance",
+                    exchange=snapshot.exchange,
+                    symbol=spot_symbol,
+                    balance=round(balance, 2),
+                    needed=round(quote_needed * 2, 2),
+                )
                 continue
 
             # Spot buy: deduct USDT, add base asset
