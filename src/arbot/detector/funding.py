@@ -165,6 +165,17 @@ class FundingRateDetector:
                         symbol=symbol,
                     )
 
+        # Fill missing prices from other exchanges' snapshots
+        symbol_prices: dict[str, float] = {}
+        for s in snapshots:
+            if s.index_price > 0 and s.symbol not in symbol_prices:
+                symbol_prices[s.symbol] = s.index_price
+        for s in snapshots:
+            if s.index_price <= 0 and s.symbol in symbol_prices:
+                s.index_price = symbol_prices[s.symbol]
+            if s.mark_price <= 0 and s.index_price > 0:
+                s.mark_price = s.index_price
+
         return snapshots
 
     def filter_opportunities(
