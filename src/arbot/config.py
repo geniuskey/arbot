@@ -72,7 +72,6 @@ class FundingDetectorConfig(BaseModel):
         default_factory=lambda: [
             "BTC/USDT:USDT",
             "ETH/USDT:USDT",
-            "SOL/USDT:USDT",
         ]
     )
 
@@ -250,7 +249,7 @@ class AppConfig(BaseSettings):
         alias="exchanges_enabled",
     )
     symbols: list[str] = Field(
-        default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"]
+        default_factory=lambda: ["BTC/USDT", "ETH/USDT"]
     )
     detector: DetectorConfig = Field(default_factory=DetectorConfig)
     risk: RiskConfig = Field(default_factory=RiskConfig)

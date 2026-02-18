@@ -685,9 +685,6 @@ exchanges:
 symbols:
   - BTC/USDT
   - ETH/USDT
-  - SOL/USDT
-  - XRP/USDT
-  - DOGE/USDT
 
 detector:
   spatial:
@@ -701,7 +698,6 @@ detector:
     min_profit_pct: 0.15
     paths:
       - [BTC/USDT, ETH/BTC, ETH/USDT]
-      - [BTC/USDT, SOL/BTC, SOL/USDT]
 
   statistical:
     enabled: false             # Phase 2 활성화

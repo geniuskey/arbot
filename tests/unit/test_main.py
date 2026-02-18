@@ -121,9 +121,7 @@ class TestBuildInitialBalances:
         assert "upbit" in balances
         assert balances["binance"]["USDT"] == 1_000.0
         assert balances["binance"]["BTC"] == 0.01
-        assert balances["binance"]["SOL"] == 5.0
-        assert balances["binance"]["XRP"] == 500.0
-        assert balances["binance"]["DOGE"] == 3_000.0
+        assert balances["binance"]["ETH"] == 0.2
         assert balances["upbit"]["USDT"] == 1_000.0
         assert balances["upbit"]["BTC"] == 0.01
 

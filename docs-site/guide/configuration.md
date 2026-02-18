@@ -48,9 +48,6 @@ exchanges:
 symbols:
   - BTC/USDT
   - ETH/USDT
-  - SOL/USDT
-  - XRP/USDT
-  - DOGE/USDT
 ```
 
 차익거래 기회를 모니터링할 거래 쌍 목록입니다. CCXT 표준 심볼 형식(`BASE/QUOTE`)을 사용합니다.
@@ -84,14 +81,13 @@ detector:
     min_profit_pct: 0.15
     paths:
       - [BTC/USDT, ETH/BTC, ETH/USDT]
-      - [BTC/USDT, SOL/BTC, SOL/USDT]
 ```
 
 | 항목 | 설명 | 기본값 |
 |------|------|--------|
 | `enabled` | Triangular 전략 활성화 | `true` |
 | `min_profit_pct` | 최소 순이익률 (%) | `0.15` |
-| `paths` | 삼각 차익 경로 (3개 거래 쌍 조합) | BTC-ETH, BTC-SOL |
+| `paths` | 삼각 차익 경로 (3개 거래 쌍 조합) | BTC-ETH |
 
 #### Statistical Arbitrage (통계적 차익)
 

@@ -69,14 +69,13 @@ USDT → BTC/USDT → ETH/BTC → ETH/USDT → USDT
 | 파라미터 | 기본값 | 설명 |
 |---------|--------|------|
 | `min_profit_pct` | 0.15% | 최소 이익률 (3회 수수료 차감 후) |
-| `paths` | BTC/ETH/SOL 조합 | 탐색할 삼각 경로 목록 |
+| `paths` | BTC/ETH 조합 | 탐색할 삼각 경로 목록 |
 
 ### 지원 경로
 
 ```yaml
 paths:
   - [BTC/USDT, ETH/BTC, ETH/USDT]
-  - [BTC/USDT, SOL/BTC, SOL/USDT]
 ```
 
 ### 장점

@@ -69,9 +69,6 @@ exchanges:
 symbols:
   - BTC/USDT
   - ETH/USDT
-  - SOL/USDT
-  - XRP/USDT
-  - DOGE/USDT
 ```
 
 ::: tip

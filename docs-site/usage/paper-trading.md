@@ -36,9 +36,6 @@ exchanges:
 symbols:
   - BTC/USDT
   - ETH/USDT
-  - SOL/USDT
-  - XRP/USDT
-  - DOGE/USDT
 ```
 
 ## 가상 포트폴리오 초기 설정
