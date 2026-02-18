@@ -44,6 +44,7 @@ class PipelineStats:
     total_pnl_usd: float = 0.0
     total_fees_usd: float = 0.0
     cycles_run: int = 0
+    rejection_reasons: dict[str, int] = field(default_factory=dict)
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -148,10 +149,12 @@ class ArbitragePipeline:
         # Risk check and execute
         portfolio = self.executor.get_portfolio()
 
+        rejection_reasons: dict[str, int] = {}
         for signal in signals:
             approved, reason = self.risk_manager.check_signal(signal, portfolio)
             if not approved:
                 self._stats.total_signals_rejected += 1
+                rejection_reasons[reason] = rejection_reasons.get(reason, 0) + 1
                 continue
 
             self._stats.total_signals_approved += 1
@@ -203,6 +206,17 @@ class ArbitragePipeline:
                     sell_exchange=signal.sell_exchange,
                     error=str(e),
                 )
+
+        if rejection_reasons:
+            for reason, count in rejection_reasons.items():
+                self._stats.rejection_reasons[reason] = (
+                    self._stats.rejection_reasons.get(reason, 0) + count
+                )
+            self._logger.debug(
+                "signals_rejected_summary",
+                rejections=rejection_reasons,
+                total=sum(rejection_reasons.values()),
+            )
 
         return results
 

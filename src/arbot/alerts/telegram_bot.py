@@ -154,6 +154,14 @@ class TelegramBotService:
             f"Win rate: {report.win_rate:.1%}"
         )
 
+        if s.rejection_reasons:
+            msg += "\n\n[Rejection Reasons]"
+            for reason, count in sorted(
+                s.rejection_reasons.items(), key=lambda x: x[1], reverse=True
+            ):
+                short = reason[:50]
+                msg += f"\n  {short}: {count}"
+
         if self._funding_manager is not None:
             fs = self._funding_manager.get_stats()
             open_count = len(self._funding_manager.open_positions)
