@@ -276,7 +276,12 @@ class FundingRateManager:
             )
 
     def _evaluate_closes(self, snapshots: list[FundingRateSnapshot]) -> None:
-        """Close positions where funding rate dropped below threshold."""
+        """Close positions where funding rate dropped below threshold.
+
+        Enforces a minimum holding period of 8h so that at least one
+        funding payment is collected before incurring exit fees.
+        Only a deeply negative rate bypasses this grace period.
+        """
         rate_map: dict[str, FundingRateSnapshot] = {
             f"{s.exchange}:{s.symbol}": s for s in snapshots
         }
@@ -291,16 +296,26 @@ class FundingRateManager:
             should_close = False
             reason = ""
 
+            # Grace period: must hold at least 8h to collect one funding payment.
+            # Only deeply negative rates (longs pay shorts heavily) bypass this.
+            in_grace = pos.holding_hours < FUNDING_INTERVAL_HOURS
+
             if snapshot is None:
                 if pos.holding_hours > 24:
                     should_close = True
                     reason = "rate_unavailable_24h"
-            elif snapshot.funding_rate <= 0:
+            elif snapshot.funding_rate < -0.001:
+                # Deeply negative: shorts pay longs, close immediately
                 should_close = True
-                reason = f"negative_rate_{snapshot.funding_rate:.6f}"
-            elif snapshot.annualized_rate < self._close_threshold:
-                should_close = True
-                reason = f"below_threshold_{snapshot.annualized_rate:.1f}pct"
+                reason = f"deeply_negative_rate_{snapshot.funding_rate:.6f}"
+            elif not in_grace:
+                # Past grace period: apply normal close rules
+                if snapshot.funding_rate <= 0:
+                    should_close = True
+                    reason = f"negative_rate_{snapshot.funding_rate:.6f}"
+                elif snapshot.annualized_rate < self._close_threshold:
+                    should_close = True
+                    reason = f"below_threshold_{snapshot.annualized_rate:.1f}pct"
 
             if should_close:
                 self._close_position(pos, reason, snapshot)
