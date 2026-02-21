@@ -219,12 +219,12 @@ class TestPaperExecutorInsufficientBalance:
         assert exc_info.value.exchange == "binance"
         assert exc_info.value.asset == "USDT"
 
-    def test_insufficient_base_for_sell(
+    def test_insufficient_base_for_sell_scales_down(
         self, signal: ArbitrageSignal, fee: TradingFee
     ) -> None:
         initial = {
             "binance": {"USDT": 100000.0},
-            "upbit": {"BTC": 0.001},  # Not enough BTC to sell 0.1
+            "upbit": {"BTC": 0.001},  # Less than 0.1 BTC, but enough for min trade
         }
         executor = PaperExecutor(
             initial_balances=initial,
@@ -235,10 +235,29 @@ class TestPaperExecutorInsufficientBalance:
             "upbit:BTC/USDT": _make_ob("upbit", "BTC/USDT", 50300, 50400),
         })
 
-        with pytest.raises(InsufficientBalanceError) as exc_info:
+        # Should scale down to 0.001 BTC instead of raising error
+        buy_result, sell_result = executor.execute(signal)
+        assert buy_result.filled_quantity <= 0.001
+        assert sell_result.filled_quantity <= 0.001
+
+    def test_insufficient_balance_below_minimum(
+        self, signal: ArbitrageSignal, fee: TradingFee
+    ) -> None:
+        initial = {
+            "binance": {"USDT": 1.0},  # Below $10 minimum
+            "upbit": {"BTC": 0.0000001},  # Below $10 minimum
+        }
+        executor = PaperExecutor(
+            initial_balances=initial,
+            exchange_fees={"binance": fee, "upbit": fee},
+        )
+        executor.update_orderbooks({
+            "binance:BTC/USDT": _make_ob("binance", "BTC/USDT", 49900, 50000),
+            "upbit:BTC/USDT": _make_ob("upbit", "BTC/USDT", 50300, 50400),
+        })
+
+        with pytest.raises(InsufficientBalanceError):
             executor.execute(signal)
-        assert exc_info.value.exchange == "upbit"
-        assert exc_info.value.asset == "BTC"
 
 
 # ---------------------------------------------------------------------------

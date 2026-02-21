@@ -99,21 +99,23 @@ class PaperExecutor(BaseExecutor):
             sell_ex, TradingFee(maker_pct=0.1, taker_pct=0.1)
         )
 
-        quantity = signal.quantity
+        # Determine trade quantity based on available balances
+        desired_quantity = signal.quantity
+        buy_price = signal.buy_price
 
-        # Check buy side: need quote asset on buy exchange
-        quote_needed = quantity * signal.buy_price
         buy_balance = self._get_balance(buy_ex, quote_asset)
-        if buy_balance < quote_needed:
-            raise InsufficientBalanceError(
-                buy_ex, quote_asset, quote_needed, buy_balance
-            )
-
-        # Check sell side: need base asset on sell exchange
         sell_balance = self._get_balance(sell_ex, base_asset)
-        if sell_balance < quantity:
+
+        # Cap quantity by what each side can afford
+        max_buy_qty = buy_balance / buy_price if buy_price > 0 else 0.0
+        max_sell_qty = sell_balance
+        quantity = min(desired_quantity, max_buy_qty, max_sell_qty)
+
+        # Minimum trade size: $10 equivalent
+        min_qty = 10.0 / buy_price if buy_price > 0 else 0.0
+        if quantity < min_qty:
             raise InsufficientBalanceError(
-                sell_ex, base_asset, quantity, sell_balance
+                buy_ex, quote_asset, desired_quantity * buy_price, buy_balance
             )
 
         # Simulate fills (use maker fee when indicated by signal metadata)
