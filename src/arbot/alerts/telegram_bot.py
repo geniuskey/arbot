@@ -183,13 +183,46 @@ class TelegramBotService:
         if not self._is_authorized(update):
             return
 
+        # Build mid-price map from orderbooks for USDT valuation
+        mid_prices: dict[str, float] = {"USDT": 1.0}
+        for key, ob in self._executor.orderbooks.items():
+            base = ob.symbol.split("/")[0]
+            if base in mid_prices:
+                continue
+            if ob.bids and ob.asks:
+                mid_prices[base] = (ob.bids[0].price + ob.asks[0].price) / 2
+            elif ob.bids:
+                mid_prices[base] = ob.bids[0].price
+            elif ob.asks:
+                mid_prices[base] = ob.asks[0].price
+
         portfolio = self._executor.get_portfolio()
         lines = ["[Portfolio Balance]"]
+        grand_total = 0.0
         for ex_name, ex_bal in portfolio.exchange_balances.items():
-            lines.append(f"\n{ex_name}:")
+            ex_total = 0.0
+            asset_lines: list[str] = []
             for asset, bal in ex_bal.balances.items():
                 if bal.total > 0:
-                    lines.append(f"  {asset}: {bal.total:,.6f}")
+                    price = mid_prices.get(asset, 0.0)
+                    usd_val = bal.total * price
+                    ex_total += usd_val
+                    if price > 0 and asset != "USDT":
+                        asset_lines.append(
+                            f"  {asset}: {bal.total:,.6f} (${usd_val:,.2f})"
+                        )
+                    else:
+                        asset_lines.append(f"  {asset}: ${bal.total:,.2f}")
+            lines.append(f"\n{ex_name}: ${ex_total:,.2f}")
+            lines.extend(asset_lines)
+
+        grand_total = sum(
+            bal.total * mid_prices.get(asset, 0.0)
+            for ex_bal in portfolio.exchange_balances.values()
+            for asset, bal in ex_bal.balances.items()
+            if bal.total > 0
+        )
+        lines.append(f"\nTotal: ${grand_total:,.2f}")
 
         assert update.message is not None
         await update.message.reply_text("\n".join(lines))
