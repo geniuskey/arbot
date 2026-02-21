@@ -126,6 +126,34 @@ class PaperExecutor(BaseExecutor):
             sell_ob, OrderSide.SELL, quantity, sell_fee, use_maker_fee=sell_maker
         )
 
+        # Match fill quantities: both sides must trade the same amount
+        matched_qty = min(buy_result.filled_quantity, sell_result.filled_quantity)
+        if matched_qty <= 0:
+            raise ValueError("zero fill on one or both sides")
+
+        if matched_qty < buy_result.filled_quantity:
+            fee_pct = (buy_fee.maker_pct if buy_maker else buy_fee.taker_pct) / 100
+            buy_result = TradeResult(
+                order=buy_result.order,
+                filled_quantity=matched_qty,
+                filled_price=buy_result.filled_price,
+                fee=matched_qty * fee_pct,
+                fee_asset=buy_result.fee_asset,
+                latency_ms=buy_result.latency_ms,
+                filled_at=buy_result.filled_at,
+            )
+        if matched_qty < sell_result.filled_quantity:
+            fee_pct = (sell_fee.maker_pct if sell_maker else sell_fee.taker_pct) / 100
+            sell_result = TradeResult(
+                order=sell_result.order,
+                filled_quantity=matched_qty,
+                filled_price=sell_result.filled_price,
+                fee=matched_qty * sell_result.filled_price * fee_pct,
+                fee_asset=sell_result.fee_asset,
+                latency_ms=sell_result.latency_ms,
+                filled_at=sell_result.filled_at,
+            )
+
         # Update balances for the buy side
         buy_cost = buy_result.filled_quantity * buy_result.filled_price
         self._adjust_balance(buy_ex, quote_asset, -buy_cost)
